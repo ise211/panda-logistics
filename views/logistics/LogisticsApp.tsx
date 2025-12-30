@@ -1163,7 +1163,7 @@ const ShipLoadingView: React.FC = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {loads.map((load, i) => (
+                                {loads.map((load) => (
                                     <tr key={load.id} className="border-b last:border-0 hover:bg-blue-50/50 transition-colors group">
                                         <td className="p-3 pl-6 text-gray-500 font-mono">
                                             {new Date(load.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
