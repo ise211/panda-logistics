@@ -66,7 +66,6 @@ const SortableHeader: React.FC<{
 );
 
 // --- Mobile Card Component ---
-// This replaces table rows on small screens
 const MobileLogisticsCard: React.FC<{
     order: Order;
     onClick?: () => void;
@@ -133,11 +132,17 @@ export const LogisticsApp: React.FC<LogisticsAppProps> = ({ user, onLogout }) =>
     setStats(s);
   };
 
+  const handleOrderCreated = () => {
+      refreshData();
+      setActiveTab('orders');
+  };
+
   const renderContent = () => {
     switch(activeTab) {
       case 'dashboard': return <Dashboard stats={stats} orders={orders} />;
+      case 'create': return <NewJobView onSuccess={handleOrderCreated} />;
       case 'orders': return <OrdersTable orders={orders} refresh={refreshData} />;
-      case 'collections': return <CollectionsView orders={orders} />;
+      case 'collections': return <CollectionsView orders={orders} refresh={refreshData} />;
       case 'delivery': return <DeliveryView orders={orders} />;
       case 'registry': return <RegistryTable orders={orders} />;
       case 'reports': return <ReportsView orders={orders} />;
@@ -149,6 +154,7 @@ export const LogisticsApp: React.FC<LogisticsAppProps> = ({ user, onLogout }) =>
   const getTitle = () => {
       switch(activeTab) {
           case 'dashboard': return 'Dashboard';
+          case 'create': return 'New Job';
           case 'orders': return 'All Jobs';
           case 'collections': return 'Collections';
           case 'delivery': return 'Deliveries';
@@ -159,14 +165,20 @@ export const LogisticsApp: React.FC<LogisticsAppProps> = ({ user, onLogout }) =>
       }
   }
 
+  const pendingWeighingCount = useMemo(() => orders.filter(o => 
+    o.status === OrderStatus.COMPLETED && 
+    o.weightRecord?.gross === 0
+  ).length, [orders]);
+
   const tabs = [
-    { id: 'dashboard', label: 'Home' },
-    { id: 'orders', label: 'Jobs' },
-    { id: 'collections', label: 'In' },
-    { id: 'delivery', label: 'Out' },
-    { id: 'registry', label: 'Wgt' },
-    { id: 'reports', label: 'Rpt' },
-    { id: 'export', label: 'Ship' },
+    { id: 'dashboard', label: 'Dashboard', mobileLabel: 'Home' },
+    { id: 'create', label: 'Create Job', mobileLabel: 'New +' },
+    { id: 'orders', label: 'All Jobs', mobileLabel: 'Jobs', count: pendingWeighingCount },
+    { id: 'collections', label: 'Collections', mobileLabel: 'In' },
+    { id: 'delivery', label: 'Deliveries', mobileLabel: 'Out' },
+    { id: 'registry', label: 'Registry', mobileLabel: 'Wgt' },
+    { id: 'reports', label: 'Reports', mobileLabel: 'Rpt' },
+    { id: 'export', label: 'Ship Export', mobileLabel: 'Ship' },
   ];
 
   return (
@@ -255,8 +267,156 @@ const Dashboard: React.FC<{ stats: any, orders: Order[] }> = ({ stats, orders })
     );
 };
 
-const CollectionsView: React.FC<{ orders: Order[] }> = ({ orders }) => {
+const NewJobView: React.FC<{ onSuccess: () => void }> = ({ onSuccess }) => {
+    const availableDrivers = MOCK_USERS.filter(u => u.role === UserRole.DRIVER);
+    const [formData, setFormData] = useState({ 
+        type: OrderType.COLLECTION,
+        client: '', 
+        address: '', 
+        weight: 0, 
+        driverId: availableDrivers[0]?.id || '',
+        truckType: TruckType.SKIP as TruckType,
+        containerSize: ContainerSize.Y8 as string
+    });
+
+    const getContainerSizes = (truck: TruckType) => {
+        if (truck === TruckType.SKIP) {
+            return [ContainerSize.Y6, ContainerSize.Y8, ContainerSize.Y12, ContainerSize.Y14, ContainerSize.Y16];
+        }
+        if (truck === TruckType.HOOKLIFT) {
+            return [ContainerSize.Y20, ContainerSize.Y35, ContainerSize.Y40];
+        }
+        return [];
+    };
+
+    useEffect(() => {
+        const sizes = getContainerSizes(formData.truckType);
+        if (!sizes.includes(formData.containerSize as ContainerSize)) {
+            setFormData(prev => ({ ...prev, containerSize: sizes[0] }));
+        }
+    }, [formData.truckType]);
+
+    const handleCreate = async () => {
+        const selectedDriver = availableDrivers.find(d => d.id === formData.driverId);
+        if (!selectedDriver) {
+            alert("Please select a valid driver");
+            return;
+        }
+
+        await createOrder({
+            type: formData.type,
+            clientName: formData.client,
+            address: formData.address,
+            plannedWeight: formData.weight,
+            scrapType: formData.type === OrderType.DELIVERY ? ScrapType.EMPTY_BIN : ScrapType.STEEL,
+            truckType: formData.truckType,
+            containerSize: formData.containerSize,
+            status: OrderStatus.PLANNED,
+            driverId: selectedDriver.id,
+            driverName: selectedDriver.name,
+            vehicleId: selectedDriver.vehicleId || 'Unknown',
+            date: new Date().toISOString().split('T')[0],
+            timeWindow: '08:00 - 16:00'
+        });
+        onSuccess();
+    };
+
+    return (
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 max-w-4xl mx-auto animate-fade-in">
+             <div className="flex items-center gap-4 mb-6 pb-6 border-b">
+                 <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-2xl">📝</div>
+                 <div>
+                     <h2 className="text-xl font-bold text-gray-800">Create New Job</h2>
+                     <p className="text-sm text-gray-500">Assign a new task to a driver</p>
+                 </div>
+             </div>
+
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                <div>
+                    <label className="block text-xs font-bold mb-2 text-gray-500 uppercase tracking-wide">Job Type</label>
+                    <select 
+                        className="w-full border p-4 rounded-xl bg-gray-50 font-bold text-lg hover:bg-white focus:bg-white transition-colors outline-none focus:ring-2 focus:ring-primary/20" 
+                        value={formData.type}
+                        onChange={e => setFormData({...formData, type: e.target.value as OrderType})}
+                    >
+                        <option value={OrderType.COLLECTION}>⬇️ Collection (Pickup)</option>
+                        <option value={OrderType.DELIVERY}>⬆️ Delivery (Drop-off)</option>
+                    </select>
+                </div>
+
+                <div className="lg:col-span-2">
+                    <label className="block text-xs font-bold mb-2 text-gray-500 uppercase tracking-wide">Assign Driver</label>
+                    <select 
+                        className="w-full border p-4 rounded-xl bg-gray-50 hover:bg-white focus:bg-white transition-colors outline-none focus:ring-2 focus:ring-primary/20" 
+                        value={formData.driverId} 
+                        onChange={e => setFormData({...formData, driverId: e.target.value})}
+                    >
+                        {availableDrivers.map(d => (
+                            <option key={d.id} value={d.id}>{d.name} ({d.vehicleId})</option>
+                        ))}
+                    </select>
+                </div>
+
+                <div className="lg:col-span-3">
+                    <label className="block text-xs font-bold mb-2 text-gray-500 uppercase tracking-wide">Client Company Name</label>
+                    <input className="w-full border p-4 rounded-xl bg-gray-50 hover:bg-white focus:bg-white transition-colors outline-none focus:ring-2 focus:ring-primary/20" value={formData.client} onChange={e => setFormData({...formData, client: e.target.value})} placeholder="e.g. Aberdeen Construction Ltd" />
+                </div>
+
+                <div className="lg:col-span-3">
+                    <label className="block text-xs font-bold mb-2 text-gray-500 uppercase tracking-wide">Site Address</label>
+                    <input className="w-full border p-4 rounded-xl bg-gray-50 hover:bg-white focus:bg-white transition-colors outline-none focus:ring-2 focus:ring-primary/20" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} placeholder="e.g. 15 Union Street, Aberdeen, AB11 6BB" />
+                </div>
+                
+                <div>
+                    <label className="block text-xs font-bold mb-2 text-gray-500 uppercase tracking-wide">Truck Type</label>
+                    <select 
+                        className="w-full border p-4 rounded-xl bg-gray-50 hover:bg-white focus:bg-white transition-colors outline-none focus:ring-2 focus:ring-primary/20"
+                        value={formData.truckType}
+                        onChange={e => setFormData({...formData, truckType: e.target.value as TruckType})}
+                    >
+                        <option value={TruckType.SKIP}>Skip Lorry</option>
+                        <option value={TruckType.HOOKLIFT}>Hooklift Lorry</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label className="block text-xs font-bold mb-2 text-gray-500 uppercase tracking-wide">Container Size</label>
+                    <select 
+                        className="w-full border p-4 rounded-xl bg-gray-50 font-mono hover:bg-white focus:bg-white transition-colors outline-none focus:ring-2 focus:ring-primary/20"
+                        value={formData.containerSize}
+                        onChange={e => setFormData({...formData, containerSize: e.target.value})}
+                    >
+                        {getContainerSizes(formData.truckType).map(size => (
+                            <option key={size} value={size}>{size}</option>
+                        ))}
+                    </select>
+                </div>
+
+                <div>
+                    <label className="block text-xs font-bold mb-2 text-gray-500 uppercase tracking-wide">Planned Weight (kg)</label>
+                    <input 
+                        className={`w-full border p-4 rounded-xl bg-gray-50 hover:bg-white focus:bg-white transition-colors outline-none focus:ring-2 focus:ring-primary/20 ${formData.type === OrderType.DELIVERY ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        type="number" 
+                        value={formData.weight} 
+                        onChange={e => setFormData({...formData, weight: parseInt(e.target.value) || 0})} 
+                        disabled={formData.type === OrderType.DELIVERY} 
+                        placeholder={formData.type === OrderType.DELIVERY ? "N/A" : "kg"}
+                    />
+                </div>
+             </div>
+
+             <div className="flex justify-end pt-4 border-t">
+                 <Button variant="success" size="lg" onClick={handleCreate} disabled={!formData.client || !formData.address} className="w-full md:w-auto min-w-[200px] shadow-lg shadow-green-500/30">
+                     Create Order
+                 </Button>
+             </div>
+        </div>
+    );
+};
+
+const CollectionsView: React.FC<{ orders: Order[], refresh: () => void }> = ({ orders, refresh }) => {
     const [sortConfig, setSortConfig] = useState<SortConfig | null>({ key: 'date', direction: 'desc' });
+    const [editingMaterialOrder, setEditingMaterialOrder] = useState<Order | null>(null);
     const collectionOrders = useMemo(() => orders.filter(o => o.type === OrderType.COLLECTION), [orders]);
     
     const handleSort = (key: string) => {
@@ -328,9 +488,20 @@ const CollectionsView: React.FC<{ orders: Order[] }> = ({ orders }) => {
                                     <div className="font-medium">{order.driverName}</div>
                                     <div className="text-xs text-gray-400">{order.vehicleId}</div>
                                 </td>
-                                <td className="p-4">
-                                    <span className="font-bold text-gray-700">{order.scrapType}</span>
-                                    {order.containerSize && <div className="text-xs text-gray-400">{order.containerSize}</div>}
+                                <td className="p-4 group relative">
+                                    <div className="flex items-center gap-2">
+                                        <div>
+                                            <span className="font-bold text-gray-700">{order.scrapType}</span>
+                                            {order.containerSize && <div className="text-xs text-gray-400">{order.containerSize}</div>}
+                                        </div>
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); setEditingMaterialOrder(order); }}
+                                            className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-blue-600 p-1 rounded hover:bg-blue-50"
+                                            title="Change Material"
+                                        >
+                                            ✎
+                                        </button>
+                                    </div>
                                 </td>
                                 <td className="p-4 text-right">
                                      {order.weightRecord ? (
@@ -351,6 +522,14 @@ const CollectionsView: React.FC<{ orders: Order[] }> = ({ orders }) => {
                     </tbody>
                 </table>
             </div>
+
+            {editingMaterialOrder && (
+                <MaterialEditModal 
+                    order={editingMaterialOrder} 
+                    onClose={() => setEditingMaterialOrder(null)} 
+                    onSuccess={() => { setEditingMaterialOrder(null); refresh(); }} 
+                />
+            )}
         </div>
     );
 };
@@ -441,21 +620,10 @@ const DeliveryView: React.FC<{ orders: Order[] }> = ({ orders }) => {
 };
 
 const OrdersTable: React.FC<{ orders: Order[], refresh: () => void }> = ({ orders, refresh }) => {
-    const [showForm, setShowForm] = useState(false);
     const [weighModalOpen, setWeighModalOpen] = useState(false);
+    const [editingMaterialOrder, setEditingMaterialOrder] = useState<Order | null>(null);
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
     const [sortConfig, setSortConfig] = useState<SortConfig | null>({ key: 'id', direction: 'desc' });
-    const availableDrivers = MOCK_USERS.filter(u => u.role === UserRole.DRIVER);
-
-    const [formData, setFormData] = useState({ 
-        type: OrderType.COLLECTION,
-        client: '', 
-        address: '', 
-        weight: 0, 
-        driverId: availableDrivers[0]?.id || '',
-        truckType: TruckType.SKIP as TruckType,
-        containerSize: ContainerSize.Y8 as string
-    });
 
     const handleSort = (key: string) => {
         let direction: SortDirection = 'asc';
@@ -466,33 +634,6 @@ const OrdersTable: React.FC<{ orders: Order[], refresh: () => void }> = ({ order
     };
 
     const sortedOrders = useSortedData(orders, sortConfig);
-
-    const handleCreate = async () => {
-        const selectedDriver = availableDrivers.find(d => d.id === formData.driverId);
-        if (!selectedDriver) {
-            alert("Please select a valid driver");
-            return;
-        }
-
-        await createOrder({
-            type: formData.type,
-            clientName: formData.client,
-            address: formData.address,
-            plannedWeight: formData.weight,
-            scrapType: formData.type === OrderType.DELIVERY ? ScrapType.EMPTY_BIN : ScrapType.STEEL,
-            truckType: formData.truckType,
-            containerSize: formData.containerSize,
-            status: OrderStatus.PLANNED,
-            driverId: selectedDriver.id,
-            driverName: selectedDriver.name,
-            vehicleId: selectedDriver.vehicleId || 'Unknown',
-            date: new Date().toISOString().split('T')[0],
-            timeWindow: '08:00 - 16:00'
-        });
-        setShowForm(false);
-        setFormData({ ...formData, client: '', address: '', weight: 0 });
-        refresh();
-    };
 
     const openWeighModal = (order: Order) => {
         setSelectedOrder(order);
@@ -511,117 +652,10 @@ const OrdersTable: React.FC<{ orders: Order[], refresh: () => void }> = ({ order
         o.weightRecord?.gross === 0
     );
 
-    const getContainerSizes = (truck: TruckType) => {
-        if (truck === TruckType.SKIP) {
-            return [ContainerSize.Y6, ContainerSize.Y8, ContainerSize.Y12, ContainerSize.Y14, ContainerSize.Y16];
-        }
-        if (truck === TruckType.HOOKLIFT) {
-            return [ContainerSize.Y20, ContainerSize.Y35, ContainerSize.Y40];
-        }
-        return [];
-    };
-
-    useEffect(() => {
-        const sizes = getContainerSizes(formData.truckType);
-        if (!sizes.includes(formData.containerSize as ContainerSize)) {
-            setFormData(prev => ({ ...prev, containerSize: sizes[0] }));
-        }
-    }, [formData.truckType]);
-
 
     return (
         <div className="space-y-6">
-            {/* Create Button (Sticky on Mobile) */}
-            <div className="fixed bottom-16 right-4 z-40 md:static md:flex md:justify-end">
-                <Button 
-                    onClick={() => setShowForm(!showForm)} 
-                    variant="primary" 
-                    className="rounded-full w-14 h-14 md:w-auto md:h-auto md:rounded-lg shadow-lg flex items-center justify-center text-2xl md:text-base"
-                >
-                    {showForm ? '✕' : '+'} <span className="hidden md:inline ml-2">New Order</span>
-                </Button>
-            </div>
-
-            {showForm && (
-                <div className="fixed inset-0 z-50 bg-white md:bg-transparent md:static md:block overflow-y-auto">
-                    <div className="md:bg-white md:p-6 md:rounded-lg md:shadow-sm md:border md:border-yellow-200 animate-fade-in p-4 min-h-screen md:min-h-0 bg-gray-50">
-                        <div className="flex justify-between items-center mb-6 md:mb-4">
-                             <h3 className="font-bold text-xl md:text-lg text-gray-700">Create New Job</h3>
-                             <button onClick={() => setShowForm(false)} className="md:hidden p-2 bg-gray-200 rounded-full">✕</button>
-                        </div>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                            <div>
-                                <label className="block text-xs font-bold mb-1 text-gray-500">Order Type</label>
-                                <select 
-                                    className="w-full border p-3 rounded-lg bg-white font-bold text-lg" 
-                                    value={formData.type}
-                                    onChange={e => setFormData({...formData, type: e.target.value as OrderType})}
-                                >
-                                    <option value={OrderType.COLLECTION}>⬇️ Collection</option>
-                                    <option value={OrderType.DELIVERY}>⬆️ Delivery</option>
-                                </select>
-                            </div>
-                            <div className="lg:col-span-3">
-                                <label className="block text-xs font-bold mb-1 text-gray-500">Client Name</label>
-                                <input className="w-full border p-3 rounded-lg" value={formData.client} onChange={e => setFormData({...formData, client: e.target.value})} placeholder="Company Name" />
-                            </div>
-                            <div className="lg:col-span-2">
-                                <label className="block text-xs font-bold mb-1 text-gray-500">Address</label>
-                                <input className="w-full border p-3 rounded-lg" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} placeholder="Street, City" />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold mb-1 text-gray-500">Assign Driver</label>
-                                <select 
-                                    className="w-full border p-3 rounded-lg bg-white" 
-                                    value={formData.driverId} 
-                                    onChange={e => setFormData({...formData, driverId: e.target.value})}
-                                >
-                                    {availableDrivers.map(d => (
-                                        <option key={d.id} value={d.id}>{d.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            
-                            <div>
-                                <label className="block text-xs font-bold mb-1 text-gray-500">Plan. Weight (kg)</label>
-                                <input className="w-full border p-3 rounded-lg" type="number" value={formData.weight} onChange={e => setFormData({...formData, weight: parseInt(e.target.value)})} disabled={formData.type === OrderType.DELIVERY} placeholder={formData.type === OrderType.DELIVERY ? "N/A" : "kg"}/>
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-bold mb-1 text-gray-500">Truck Type</label>
-                                <select 
-                                    className="w-full border p-3 rounded-lg bg-white"
-                                    value={formData.truckType}
-                                    onChange={e => setFormData({...formData, truckType: e.target.value as TruckType})}
-                                >
-                                    <option value={TruckType.SKIP}>Skip Lorry</option>
-                                    <option value={TruckType.HOOKLIFT}>Hooklift Lorry</option>
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-bold mb-1 text-gray-500">Container Size</label>
-                                <select 
-                                    className="w-full border p-3 rounded-lg bg-white font-mono"
-                                    value={formData.containerSize}
-                                    onChange={e => setFormData({...formData, containerSize: e.target.value})}
-                                >
-                                    {getContainerSizes(formData.truckType).map(size => (
-                                        <option key={size} value={size}>{size}</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                        </div>
-                        <div className="flex justify-end gap-3 pb-20 md:pb-0">
-                            <Button variant="secondary" className="hidden md:inline-flex" onClick={() => setShowForm(false)}>Cancel</Button>
-                            <Button variant="success" fullWidth onClick={handleCreate} disabled={!formData.client || !formData.address} size="lg">Create Order</Button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
+            
             {pendingWeighingOrders.length > 0 && (
                 <div className="animate-fade-in mb-6">
                     <div className="flex items-center gap-2 mb-2">
@@ -728,9 +762,25 @@ const OrdersTable: React.FC<{ orders: Order[], refresh: () => void }> = ({ order
                                         <div className="font-bold">{order.clientName}</div>
                                         <div className="text-xs text-gray-500">{order.address}</div>
                                     </td>
-                                    <td className="p-4">
+                                    <td className="p-4 group relative">
                                         <div className="font-medium">{order.truckType || 'Lorry'}</div>
-                                        <div className="text-xs text-primary font-bold">{order.containerSize || ''}</div>
+                                        
+                                        <div className="flex items-center gap-1">
+                                            <span className="text-xs text-primary font-bold">{order.containerSize || ''}</span>
+                                            {order.type === OrderType.COLLECTION && (
+                                                <div className="flex items-center">
+                                                    <span className="text-xs text-gray-400"> • {order.scrapType}</span>
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); setEditingMaterialOrder(order); }}
+                                                        className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-blue-600 p-1 rounded hover:bg-blue-50 ml-1"
+                                                        title="Change Material"
+                                                    >
+                                                        ✎
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                        
                                         <div className="text-xs text-gray-400">{order.driverName}</div>
                                     </td>
                                     <td className="p-4">
@@ -768,480 +818,412 @@ const OrdersTable: React.FC<{ orders: Order[], refresh: () => void }> = ({ order
                     onSuccess={handleWeighSuccess} 
                 />
             )}
+
+            {editingMaterialOrder && (
+                <MaterialEditModal 
+                    order={editingMaterialOrder} 
+                    onClose={() => setEditingMaterialOrder(null)} 
+                    onSuccess={() => { setEditingMaterialOrder(null); refresh(); }} 
+                />
+            )}
         </div>
     );
 };
 
 const RegistryTable: React.FC<{ orders: Order[] }> = ({ orders }) => {
-    const [sortConfig, setSortConfig] = useState<SortConfig | null>({ key: 'weightRecord.timestamp', direction: 'desc' });
-    const completedOrders = orders.filter(o => o.weightRecord);
-
-    const handleSort = (key: string) => {
-        let direction: SortDirection = 'asc';
-        if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
-            direction = 'desc';
-        }
-        setSortConfig({ key, direction });
-    };
-
-    const sortedOrders = useSortedData(completedOrders, sortConfig);
-
-    return (
-        <div className="bg-white shadow-sm rounded-lg overflow-hidden">
-             <div className="p-4 border-b flex flex-col md:flex-row gap-4">
-                <input placeholder="Search ticket..." className="border p-3 rounded-lg text-sm w-full md:w-64" />
-                <button className="text-sm bg-gray-100 px-4 py-3 rounded-lg hover:bg-gray-200">Filter Date</button>
-             </div>
-            
-            {/* Mobile View */}
-            <div className="md:hidden">
-                {sortedOrders.map(order => (
-                    <div key={order.id} className="p-4 border-b border-gray-100 last:border-0">
-                        <div className="flex justify-between mb-1">
-                            <span className="font-mono font-bold text-gray-800">{order.weightRecord!.ticketNumber}</span>
-                            <span className="text-gray-400 text-xs">{new Date(order.weightRecord!.timestamp).toLocaleDateString()}</span>
-                        </div>
-                        <div className="font-bold text-lg mb-1">{order.clientName}</div>
-                        <div className="flex justify-between items-end">
-                            <span className="text-sm bg-gray-100 px-2 py-1 rounded text-gray-600">{order.scrapType}</span>
-                            <span className="font-bold text-xl text-primary">{order.weightRecord!.net} kg</span>
-                        </div>
-                    </div>
-                ))}
-            </div>
-
-            {/* Desktop Table */}
-            <div className="hidden md:block">
-                <table className="w-full text-left text-sm">
-                    <thead className="bg-gray-100 border-b">
-                        <tr>
-                            <SortableHeader label="Date/Time" sortKey="weightRecord.timestamp" currentSort={sortConfig} onSort={handleSort} />
-                            <SortableHeader label="Ticket No" sortKey="weightRecord.ticketNumber" currentSort={sortConfig} onSort={handleSort} />
-                            <SortableHeader label="Client" sortKey="clientName" currentSort={sortConfig} onSort={handleSort} />
-                            <SortableHeader label="Driver" sortKey="driverName" currentSort={sortConfig} onSort={handleSort} />
-                            <SortableHeader label="Cargo" sortKey="scrapType" currentSort={sortConfig} onSort={handleSort} />
-                            <SortableHeader label="Tare" sortKey="weightRecord.tare" currentSort={sortConfig} onSort={handleSort} align="right" />
-                            <SortableHeader label="Gross" sortKey="weightRecord.gross" currentSort={sortConfig} onSort={handleSort} align="right" />
-                            <SortableHeader label="Net" sortKey="weightRecord.net" currentSort={sortConfig} onSort={handleSort} align="right" />
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {sortedOrders.map(order => (
-                            <tr key={order.id} className="border-b hover:bg-gray-50">
-                                <td className="p-4 text-gray-600">{new Date(order.weightRecord!.timestamp).toLocaleString()}</td>
-                                <td className="p-4 font-mono font-bold">{order.weightRecord!.ticketNumber}</td>
-                                <td className="p-4">{order.clientName}</td>
-                                <td className="p-4 text-gray-700">{order.driverName}</td>
-                                <td className="p-4">{order.scrapType}</td>
-                                <td className="p-4 text-right text-gray-500">{order.weightRecord!.tare} kg</td>
-                                <td className="p-4 text-right text-gray-500">{order.weightRecord!.gross} kg</td>
-                                <td className="p-4 text-right font-bold">
-                                    {order.weightRecord!.gross === 0 ? (
-                                        <span className="text-orange-500 italic" title="Estimated">~ {order.weightRecord!.net} kg</span>
-                                    ) : (
-                                        <span>{order.weightRecord!.net} kg</span>
-                                    )}
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-            {sortedOrders.length === 0 && (
-                <div className="p-8 text-center text-gray-500">No recorded weighings.</div>
-            )}
-        </div>
-    );
-};
-
-const ReportsView: React.FC<{ orders: Order[] }> = ({ orders }) => {
-    const [materialFilter, setMaterialFilter] = useState('');
-    const [startDate, setStartDate] = useState('');
-    const [sortConfig, setSortConfig] = useState<SortConfig | null>({ key: 'weightRecord.timestamp', direction: 'desc' });
-
-    const filteredData = useMemo(() => {
-        if (!materialFilter && !startDate) return [];
-
-        return orders.filter(o => {
-            if (o.status !== OrderStatus.COMPLETED || !o.weightRecord) return false;
-            const matchesMaterial = materialFilter 
-                ? o.scrapType.toLowerCase().includes(materialFilter.toLowerCase())
-                : true;
-            const matchesDate = startDate 
-                ? new Date(o.weightRecord.timestamp) >= new Date(startDate)
-                : true;
-            return matchesMaterial && matchesDate;
-        });
-    }, [orders, materialFilter, startDate]);
-
-    const handleSort = (key: string) => {
-        let direction: SortDirection = 'asc';
-        if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
-            direction = 'desc';
-        }
-        setSortConfig({ key, direction });
-    };
-
-    const sortedData = useSortedData(filteredData, sortConfig);
-    const totalWeight = sortedData.reduce((sum, o) => sum + (o.weightRecord?.net || 0), 0);
-
-    const handleExport = () => {
-         // ... csv logic same
-         alert("CSV Export downloaded (simulated)");
-    };
-
-    return (
-        <div className="space-y-6">
-            <div className="bg-white p-6 rounded-xl shadow-sm">
-                <div className="flex items-center justify-between mb-6">
-                     <div className="flex items-center gap-3">
-                         <span className="text-3xl">⚖️</span>
-                         <h2 className="text-2xl font-bold text-gray-800">Yield Calculator</h2>
-                     </div>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-                    <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-2">Material</label>
-                        <input 
-                            type="text"
-                            className="w-full border border-gray-300 rounded-lg p-3"
-                            placeholder="e.g. Copper..."
-                            value={materialFilter}
-                            onChange={(e) => setMaterialFilter(e.target.value)}
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-2">From Date</label>
-                        <input 
-                            type="date"
-                            className="w-full border border-gray-300 rounded-lg p-3"
-                            value={startDate}
-                            onChange={(e) => setStartDate(e.target.value)}
-                        />
-                    </div>
-                </div>
-
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 text-center md:text-left">
-                    <div className="text-sm font-bold text-gray-500 uppercase tracking-wider">Total Weight</div>
-                    <div className="text-4xl font-extrabold text-primary mt-1">
-                        {totalWeight.toLocaleString()} <span className="text-xl text-gray-600">kg</span>
-                    </div>
-                    <Button onClick={handleExport} disabled={sortedData.length === 0} variant="primary" className="mt-4 w-full md:w-auto">
-                        📥 Export CSV
-                    </Button>
-                </div>
-            </div>
-            
-            {/* Result List - simplified for mobile */}
-            {sortedData.length > 0 && (
-                <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                    {/* Mobile View */}
-                    <div className="md:hidden">
-                        {sortedData.map(order => (
-                            <div key={order.id} className="p-4 border-b border-gray-100 flex justify-between items-center">
-                                <div>
-                                    <div className="font-bold text-gray-800">{order.clientName}</div>
-                                    <div className="text-xs text-gray-500">{new Date(order.weightRecord!.timestamp).toLocaleDateString()}</div>
-                                </div>
-                                <div className="text-right font-mono font-bold">
-                                    {order.weightRecord!.net} kg
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                    {/* Desktop View (Reuse existing) */}
-                    <div className="hidden md:block">
-                        <table className="w-full text-left text-sm">
-                            <thead className="bg-gray-50 border-b border-gray-200">
-                                <tr>
-                                    <SortableHeader label="Date" sortKey="weightRecord.timestamp" currentSort={sortConfig} onSort={handleSort} />
-                                    <SortableHeader label="Client" sortKey="clientName" currentSort={sortConfig} onSort={handleSort} />
-                                    <SortableHeader label="Net" sortKey="weightRecord.net" currentSort={sortConfig} onSort={handleSort} align="right" />
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {sortedData.map(order => (
-                                    <tr key={order.id} className="border-b">
-                                        <td className="p-3">{new Date(order.weightRecord!.timestamp).toLocaleDateString()}</td>
-                                        <td className="p-3">{order.clientName}</td>
-                                        <td className="p-3 text-right">{order.weightRecord!.net} kg</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-};
-
-const ShipLoadingView: React.FC = () => {
-    // Local state for the session
-    const [targetWeightTons, setTargetWeightTons] = useState(4000);
-    const [loads, setLoads] = useState<ExportLoad[]>([]);
-    
-    // Form Inputs
-    const [inputReg, setInputReg] = useState('');
-    const [inputWeight, setInputWeight] = useState('');
-
-    // Unique set of trucks used today for quick selection
-    const activeTrucks = useMemo(() => {
-        return Array.from(new Set(loads.map(l => l.truckReg)));
-    }, [loads]);
-
-    const totalLoadedKg = loads.reduce((acc, curr) => acc + curr.netWeight, 0);
-    const totalLoadedTons = totalLoadedKg / 1000;
-    const progressPercent = Math.min((totalLoadedTons / targetWeightTons) * 100, 100);
-
-    const handleAddLoad = (e?: React.FormEvent) => {
-        if (e) e.preventDefault();
-        
-        const weight = parseFloat(inputWeight);
-        if (!inputReg || !weight || weight <= 0) return;
-
-        const newLoad: ExportLoad = {
-            id: `ex-${Date.now()}`,
-            truckReg: inputReg.toUpperCase().trim(),
-            netWeight: weight,
-            timestamp: new Date().toISOString()
-        };
-
-        setLoads([newLoad, ...loads]);
-        setInputWeight('');
-        // Keep reg if needed on mobile to speed up? maybe not.
-        setInputReg('');
-    };
-
-    const selectQuickTruck = (reg: string) => {
-        setInputReg(reg);
-        // On mobile, focusing might open keyboard covering buttons, handle carefully
-        document.getElementById('weightInput')?.focus();
-    };
+    // Filter for completed items with valid weight records
+    const records = orders
+        .filter(o => o.status === OrderStatus.COMPLETED && o.weightRecord && o.weightRecord.gross > 0)
+        .sort((a, b) => new Date(b.weightRecord!.timestamp).getTime() - new Date(a.weightRecord!.timestamp).getTime());
 
     return (
         <div className="space-y-4">
-            {/* Target & Progress Header */}
-            <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm border-b-4 border-blue-500">
-                <div className="flex justify-between items-end mb-4">
-                    <div>
-                        <h2 className="text-xl md:text-2xl font-bold text-gray-800 flex items-center gap-2">
-                            <span>⚓</span> Ship Export
-                        </h2>
-                        <div className="flex items-center gap-2 mt-2">
-                             <span className="text-xs md:text-sm text-gray-500">Target (t):</span>
-                             <input 
-                                type="number" 
-                                value={targetWeightTons} 
-                                onChange={(e) => setTargetWeightTons(parseFloat(e.target.value) || 0)}
-                                className="w-20 border rounded px-2 py-1 text-sm font-bold text-blue-800"
-                             />
-                        </div>
-                    </div>
-                    <div className="text-right">
-                        <div className="text-3xl md:text-4xl font-extrabold text-blue-600">{totalLoadedTons.toFixed(2)} <span className="text-lg text-gray-400">t</span></div>
-                        <div className="text-xs text-gray-500">Loaded</div>
-                    </div>
-                </div>
-
-                {/* Progress Bar */}
-                <div className="relative w-full h-6 md:h-8 bg-gray-100 rounded-full overflow-hidden">
-                    <div 
-                        className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 flex items-center justify-center text-white font-bold text-xs"
-                        style={{ width: `${progressPercent}%` }}
-                    >
-                        {progressPercent > 10 && `${progressPercent.toFixed(1)}%`}
-                    </div>
-                </div>
+            <div className="hidden md:block bg-white shadow-sm rounded-lg overflow-hidden">
+                <table className="w-full text-left text-sm">
+                    <thead className="bg-gray-100 border-b">
+                        <tr>
+                            <th className="p-4">Date</th>
+                            <th className="p-4">Ticket</th>
+                            <th className="p-4">Client</th>
+                            <th className="p-4">Material</th>
+                            <th className="p-4 text-right">Gross</th>
+                            <th className="p-4 text-right">Tare</th>
+                            <th className="p-4 text-right">Net</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {records.map(order => (
+                            <tr key={order.id} className="border-b hover:bg-gray-50">
+                                <td className="p-4 text-gray-500">{new Date(order.weightRecord!.timestamp).toLocaleDateString()}</td>
+                                <td className="p-4 font-mono font-bold">{order.weightRecord!.ticketNumber}</td>
+                                <td className="p-4">{order.clientName}</td>
+                                <td className="p-4">{order.scrapType}</td>
+                                <td className="p-4 text-right text-gray-400">{order.weightRecord!.gross}</td>
+                                <td className="p-4 text-right text-gray-400">{order.weightRecord!.tare}</td>
+                                <td className="p-4 text-right font-bold text-gray-800">{order.weightRecord!.net} kg</td>
+                            </tr>
+                        ))}
+                         {records.length === 0 && (
+                            <tr>
+                                <td colSpan={7} className="p-10 text-center text-gray-400">No records found</td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
             </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                
-                {/* Input Column */}
-                <div className="lg:col-span-1 space-y-4">
-                    <form onSubmit={handleAddLoad} className="bg-white p-4 md:p-6 rounded-xl shadow-sm">
-                        <h3 className="font-bold text-lg mb-4 text-gray-700">Add Load</h3>
-                        
-                        <div className="grid grid-cols-2 gap-4 mb-4">
-                            <div>
-                                <label className="block text-xs font-bold text-gray-600 mb-1">Truck Reg</label>
-                                <input 
-                                    type="text"
-                                    className="w-full border-2 border-gray-200 rounded-lg p-3 text-lg font-mono uppercase focus:border-blue-500 outline-none"
-                                    placeholder="WA 123"
-                                    value={inputReg}
-                                    onChange={(e) => setInputReg(e.target.value)}
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-bold text-gray-600 mb-1">Net (kg)</label>
-                                <input 
-                                    id="weightInput"
-                                    type="number"
-                                    className="w-full border-2 border-gray-200 rounded-lg p-3 text-lg font-mono focus:border-blue-500 outline-none"
-                                    placeholder="0"
-                                    value={inputWeight}
-                                    onChange={(e) => setInputWeight(e.target.value)}
-                                />
-                            </div>
+             <div className="md:hidden space-y-3">
+                {records.map(order => (
+                    <div key={order.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                        <div className="flex justify-between mb-2">
+                             <span className="font-mono font-bold text-gray-500">#{order.weightRecord!.ticketNumber}</span>
+                             <span className="text-xs text-gray-400">{new Date(order.weightRecord!.timestamp).toLocaleDateString()}</span>
                         </div>
-
-                        <Button type="submit" fullWidth size="lg" disabled={!inputReg || !inputWeight}>
-                            + ADD LOAD
-                        </Button>
-                    </form>
-
-                    {/* Quick Select for Rotation */}
-                    {activeTrucks.length > 0 && (
-                        <div className="bg-white p-4 rounded-xl shadow-sm overflow-x-auto">
-                            <h3 className="font-bold text-xs mb-3 text-gray-500 uppercase tracking-wide">Quick Select</h3>
-                            <div className="flex gap-2">
-                                {activeTrucks.map(reg => (
-                                    <button
-                                        key={reg}
-                                        onClick={() => selectQuickTruck(reg)}
-                                        className={`px-3 py-2 rounded border border-gray-200 hover:bg-blue-50 hover:border-blue-300 font-mono text-sm whitespace-nowrap transition-colors ${inputReg === reg ? 'bg-blue-100 border-blue-500 text-blue-800' : 'bg-gray-50 text-gray-700'}`}
-                                    >
-                                        {reg}
-                                    </button>
-                                ))}
+                        <div className="font-bold text-lg mb-1">{order.clientName}</div>
+                        <div className="text-sm text-gray-600 mb-3">{order.scrapType}</div>
+                        <div className="flex justify-between items-end border-t pt-2">
+                            <div className="text-xs text-gray-400">
+                                G: {order.weightRecord!.gross} / T: {order.weightRecord!.tare}
                             </div>
+                            <div className="font-black text-xl text-primary">{order.weightRecord!.net} kg</div>
                         </div>
-                    )}
-                </div>
-
-                {/* History List Column */}
-                <div className="lg:col-span-2">
-                    <div className="bg-white rounded-xl shadow-sm overflow-hidden h-full">
-                         <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
-                             <h3 className="font-bold text-gray-700">Recent Loads</h3>
-                             <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold">{loads.length}</span>
-                         </div>
-                         <div className="overflow-y-auto max-h-[400px] md:max-h-[600px]">
-                            {/* Mobile List */}
-                            <div className="md:hidden">
-                                {loads.map((load) => (
-                                     <div key={load.id} className="p-3 border-b flex justify-between items-center">
-                                         <div>
-                                             <div className="font-mono font-bold text-lg">{load.truckReg}</div>
-                                             <div className="text-xs text-gray-400">{new Date(load.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
-                                         </div>
-                                         <div className="text-lg text-gray-700">{load.netWeight} kg</div>
-                                     </div>
-                                ))}
-                            </div>
-
-                            {/* Desktop Table */}
-                            <table className="hidden md:table w-full text-left text-sm">
-                                <thead className="bg-gray-100 sticky top-0">
-                                    <tr>
-                                        <th className="p-3">Time</th>
-                                        <th className="p-3">Truck Reg</th>
-                                        <th className="p-3 text-right">Weight (kg)</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {loads.map((load) => {
-                                        return (
-                                            <tr key={load.id} className="border-b hover:bg-gray-50 animate-fade-in">
-                                                <td className="p-3 text-gray-500 font-mono">
-                                                    {new Date(load.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                                                </td>
-                                                <td className="p-3 font-bold font-mono">{load.truckReg}</td>
-                                                <td className="p-3 text-right text-lg">{load.netWeight}</td>
-                                            </tr>
-                                        )
-                                    })}
-                                </tbody>
-                            </table>
-                         </div>
                     </div>
-                </div>
-
+                ))}
             </div>
         </div>
     );
 };
 
 const WeighbridgeModal: React.FC<{ order: Order, onClose: () => void, onSuccess: () => void }> = ({ order, onClose, onSuccess }) => {
-    const [gross, setGross] = useState<string>(order.weightRecord?.gross && order.weightRecord.gross > 0 ? order.weightRecord.gross.toString() : '');
-    const [tare, setTare] = useState<string>(order.weightRecord?.tare && order.weightRecord.tare > 0 ? order.weightRecord.tare.toString() : '');
-    const [ticket, setTicket] = useState<string>(order.weightRecord?.ticketNumber || '');
-    const [material] = useState<string>(order.scrapType);
-
-    const net = (parseFloat(gross) || 0) - (parseFloat(tare) || 0);
+    const [gross, setGross] = useState(order.weightRecord?.gross || 0);
+    const [tare, setTare] = useState(order.weightRecord?.tare || 0);
+    const [ticket, setTicket] = useState(order.weightRecord?.ticketNumber || '');
+    
+    // Calculate net automatically
+    const net = Math.max(0, gross - tare);
 
     const handleSave = async () => {
-        if (!gross || !tare) return;
-
         await updateOrderStatus(order.id, OrderStatus.COMPLETED, {
-            scrapType: material,
             weightRecord: {
-                ...order.weightRecord!, // preserve timestamp
-                gross: parseFloat(gross),
-                tare: parseFloat(tare),
-                net: net,
-                ticketNumber: ticket
+                gross,
+                tare,
+                net,
+                ticketNumber: ticket || `T-${Math.floor(Math.random() * 100000)}`,
+                timestamp: new Date().toISOString()
             }
         });
         onSuccess();
     };
 
     return (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end md:items-center justify-center z-50 p-4 md:p-4">
-            <div className="bg-white w-full rounded-t-2xl md:rounded-xl shadow-2xl max-w-md p-6 animate-slide-up md:animate-scale-in">
-                <div className="flex justify-between items-center mb-6 border-b pb-4">
-                    <h3 className="text-xl font-bold text-gray-800">Finalize Weighing</h3>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-2 bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center">✕</button>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+             <div className="bg-white w-full max-w-md rounded-xl shadow-2xl p-6 animate-scale-in">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-xl font-bold text-gray-800">Weighbridge Entry</h3>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
                 </div>
 
-                <div className="space-y-4 mb-6">
-                    <div className="bg-gray-50 p-3 rounded text-sm text-gray-600">
-                        <div><strong>Client:</strong> {order.clientName}</div>
-                        <div><strong>Driver:</strong> {order.driverName}</div>
+                <div className="mb-6 space-y-4">
+                    <div className="bg-gray-50 p-4 rounded-lg text-sm">
+                        <div className="flex justify-between mb-1">
+                            <span className="text-gray-500">Client:</span>
+                            <span className="font-bold">{order.clientName}</span>
+                        </div>
+                        <div className="flex justify-between mb-1">
+                            <span className="text-gray-500">Material:</span>
+                            <span className="font-bold">{order.scrapType}</span>
+                        </div>
+                         <div className="flex justify-between">
+                            <span className="text-gray-500">Driver Ticket:</span>
+                            <span className="font-mono">{order.weightRecord?.ticketNumber || 'N/A'}</span>
+                        </div>
+                         <div className="flex justify-between">
+                            <span className="text-gray-500">Driver Est:</span>
+                            <span className="font-mono">{order.weightRecord?.net || 0} kg</span>
+                        </div>
                     </div>
 
                     <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-1">Ticket #</label>
+                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Weighbridge Ticket #</label>
                         <input 
-                            className="w-full border border-gray-300 rounded-lg p-3 font-mono text-lg"
+                            className="w-full border-2 border-gray-200 p-3 rounded-lg font-mono focus:border-primary outline-none"
                             value={ticket}
                             onChange={e => setTicket(e.target.value)}
+                            placeholder="Enter ticket number"
                         />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-bold text-gray-700 mb-1">Gross (kg)</label>
+                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Gross (kg)</label>
                             <input 
                                 type="number" 
-                                className="w-full border border-gray-300 rounded-lg p-3 text-lg"
-                                value={gross}
-                                onChange={e => setGross(e.target.value)}
+                                className="w-full border-2 border-gray-200 p-3 rounded-lg font-mono font-bold text-lg focus:border-primary outline-none"
+                                value={gross || ''}
+                                onChange={e => setGross(parseInt(e.target.value) || 0)}
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-bold text-gray-700 mb-1">Tare (kg)</label>
+                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Tare (kg)</label>
                             <input 
                                 type="number" 
-                                className="w-full border border-gray-300 rounded-lg p-3 text-lg"
-                                value={tare}
-                                onChange={e => setTare(e.target.value)}
+                                className="w-full border-2 border-gray-200 p-3 rounded-lg font-mono font-bold text-lg focus:border-primary outline-none"
+                                value={tare || ''}
+                                onChange={e => setTare(parseInt(e.target.value) || 0)}
                             />
                         </div>
                     </div>
 
-                    <div className="bg-blue-50 p-4 rounded-lg flex justify-between items-center">
-                        <span className="font-bold text-blue-900">Final Net:</span>
-                        <span className="text-2xl font-bold text-blue-700">{net > 0 ? net : 0} kg</span>
+                    <div className="bg-blue-50 p-4 rounded-lg flex justify-between items-center border border-blue-100">
+                        <span className="text-blue-800 font-bold uppercase text-sm">Net Weight</span>
+                        <span className="text-2xl font-black text-blue-900">{net} kg</span>
                     </div>
                 </div>
 
+                <div className="flex gap-3">
+                    <Button variant="secondary" onClick={onClose} fullWidth>Cancel</Button>
+                    <Button variant="primary" onClick={handleSave} fullWidth disabled={net <= 0 || !ticket}>Confirm</Button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const ReportsView: React.FC<{ orders: Order[] }> = () => {
+    return (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
+            {['Daily Weight Log', 'Driver Timesheets', 'Client Waste Transfer Notes', 'Monthly Volume Summary'].map((item, i) => (
+                <div key={i} className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center text-center hover:shadow-md transition-all">
+                    <div className="w-16 h-16 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center text-3xl mb-4">
+                        📄
+                    </div>
+                    <h3 className="font-bold text-lg mb-2">{item}</h3>
+                    <p className="text-sm text-gray-400 mb-6">Generate and download PDF report.</p>
+                    <Button variant="outline" size="sm">Download PDF ⬇</Button>
+                </div>
+            ))}
+        </div>
+    );
+};
+
+const ShipLoadingView: React.FC = () => {
+    const [targetTons, setTargetTons] = useState(3500);
+    const [loads, setLoads] = useState<ExportLoad[]>([
+        { id: 'EXP-8821', truckReg: 'SV68 HGA', netWeight: 28400, timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString() },
+        { id: 'EXP-8822', truckReg: 'SA21 BCD', netWeight: 29150, timestamp: new Date(Date.now() - 1000 * 60 * 90).toISOString() },
+        { id: 'EXP-8823', truckReg: 'SY19 JKL', netWeight: 27800, timestamp: new Date(Date.now() - 1000 * 60 * 150).toISOString() },
+    ]);
+    
+    const [reg, setReg] = useState('');
+    const [weight, setWeight] = useState('');
+
+    const totalLoadedKg = loads.reduce((acc, curr) => acc + curr.netWeight, 0);
+    const totalLoadedTons = totalLoadedKg / 1000;
+    const progress = Math.min((totalLoadedTons / targetTons) * 100, 100);
+    const remainingTons = Math.max(targetTons - totalLoadedTons, 0);
+
+    const handleAddLoad = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!reg || !weight) return;
+        
+        const newLoad: ExportLoad = {
+            id: `EXP-${Math.floor(1000 + Math.random() * 9000)}`,
+            truckReg: reg.toUpperCase(),
+            netWeight: parseInt(weight),
+            timestamp: new Date().toISOString()
+        };
+        
+        setLoads([newLoad, ...loads]);
+        setReg('');
+        setWeight('');
+    };
+
+    return (
+        <div className="space-y-6 animate-fade-in">
+             {/* Hero / Status Section */}
+             <div className="bg-gradient-to-r from-blue-900 to-slate-800 text-white p-6 md:p-8 rounded-2xl shadow-xl relative overflow-hidden">
+                <div className="relative z-10 grid md:grid-cols-2 gap-8 items-end">
+                    <div>
+                        <div className="inline-flex items-center gap-2 bg-white/10 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-2 border border-white/20">
+                            <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"/> Active Loading
+                        </div>
+                        <h2 className="text-3xl font-black mb-1">MV Nordic Star</h2>
+                        <div className="flex items-center gap-4 text-sm opacity-80 font-medium">
+                            <span>Destination: Turkey (Aliaga)</span>
+                            <span>•</span>
+                            <span>Cargo: HMS 1/2</span>
+                        </div>
+                    </div>
+                    <div className="text-left md:text-right">
+                        <div className="flex flex-col md:items-end">
+                            <div className="text-5xl font-black mb-1 flex items-baseline gap-2">
+                                {totalLoadedTons.toFixed(1)} 
+                                <span className="text-2xl opacity-60 font-medium">/ 
+                                    <input 
+                                        type="number" 
+                                        value={targetTons} 
+                                        onChange={(e) => setTargetTons(Number(e.target.value))}
+                                        className="w-24 bg-transparent border-b border-white/30 text-center outline-none focus:border-white ml-1"
+                                    /> 
+                                    t
+                                </span>
+                            </div>
+                            <div className="text-sm opacity-60 font-mono">Metric Tonnes Loaded</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="mt-8">
+                    <div className="flex justify-between text-xs font-bold uppercase tracking-widest opacity-60 mb-2">
+                        <span>Progress</span>
+                        <span>{progress.toFixed(1)}% ({remainingTons.toFixed(1)}t remaining)</span>
+                    </div>
+                    <div className="w-full bg-black/30 h-4 rounded-full overflow-hidden backdrop-blur-sm shadow-inner">
+                        <div 
+                            className="bg-gradient-to-r from-green-400 to-emerald-500 h-full transition-all duration-1000 ease-out relative" 
+                            style={{ width: `${progress}%` }}
+                        >
+                            <div className="absolute top-0 left-0 w-full h-full bg-white/20 animate-shimmer" />
+                        </div>
+                    </div>
+                </div>
+                
+                <div className="absolute right-[-20px] bottom-[-40px] text-9xl opacity-5 pointer-events-none select-none transform rotate-12">
+                    🚢
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Input Form */}
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-fit">
+                    <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                        <span>📝</span> Register New Load
+                    </h3>
+                    <form onSubmit={handleAddLoad} className="space-y-4">
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Vehicle Reg</label>
+                            <input 
+                                type="text" 
+                                value={reg}
+                                onChange={e => setReg(e.target.value)}
+                                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg font-mono text-lg uppercase focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                                placeholder="e.g. SV68 HGA"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Net Weight (kg)</label>
+                            <input 
+                                type="number" 
+                                value={weight}
+                                onChange={e => setWeight(e.target.value)}
+                                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg font-mono text-lg focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                                placeholder="0"
+                            />
+                        </div>
+                        <Button fullWidth type="submit" variant="primary" disabled={!reg || !weight} className="shadow-lg shadow-blue-500/20">
+                            Add Load +
+                        </Button>
+                    </form>
+                    
+                    <div className="mt-6 pt-6 border-t border-gray-100">
+                        <div className="text-xs font-bold text-gray-400 uppercase mb-3">Quick Fill (Recent Trucks)</div>
+                        <div className="flex flex-wrap gap-2">
+                            {Array.from(new Set(loads.map(l => l.truckReg))).slice(0, 4).map(r => (
+                                <button 
+                                    key={r} 
+                                    onClick={() => setReg(r)}
+                                    type="button"
+                                    className="px-3 py-1 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded text-xs font-mono font-bold text-gray-600 transition-colors"
+                                >
+                                    {r}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Table */}
+                <div className="lg:col-span-2 bg-white shadow-sm rounded-xl overflow-hidden border border-gray-100 flex flex-col h-[500px]">
+                    <div className="p-4 border-b bg-gray-50 flex justify-between items-center flex-shrink-0">
+                        <div className="flex items-center gap-2">
+                            <h3 className="font-bold text-gray-700">Load History</h3>
+                            <span className="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-0.5 rounded-full">{loads.length}</span>
+                        </div>
+                        <div className="flex gap-2">
+                            <Button size="sm" variant="outline" onClick={() => alert('Manifest generated')}>📄 Manifest</Button>
+                        </div>
+                    </div>
+                    <div className="overflow-auto flex-1">
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-gray-50 text-gray-500 sticky top-0 z-10 shadow-sm">
+                                <tr>
+                                    <th className="p-3 pl-6">Time</th>
+                                    <th className="p-3">ID</th>
+                                    <th className="p-3">Vehicle</th>
+                                    <th className="p-3 text-right pr-6">Net (kg)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {loads.map((load, i) => (
+                                    <tr key={load.id} className="border-b last:border-0 hover:bg-blue-50/50 transition-colors group">
+                                        <td className="p-3 pl-6 text-gray-500 font-mono">
+                                            {new Date(load.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                        </td>
+                                        <td className="p-3 font-mono text-xs text-gray-400 group-hover:text-gray-600">{load.id}</td>
+                                        <td className="p-3 font-bold">{load.truckReg}</td>
+                                        <td className="p-3 text-right pr-6 font-bold font-mono text-gray-700">{load.netWeight.toLocaleString()}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div className="p-3 border-t bg-gray-50 text-xs text-gray-400 text-center flex-shrink-0">
+                        Showing all {loads.length} loads for current session
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// --- ADDED: Material Edit Modal ---
+const MaterialEditModal: React.FC<{ order: Order, onClose: () => void, onSuccess: () => void }> = ({ order, onClose, onSuccess }) => {
+    const [material, setMaterial] = useState(order.scrapType);
+
+    const handleSave = async () => {
+        await updateOrderStatus(order.id, order.status, { scrapType: material });
+        onSuccess();
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white w-full max-w-sm rounded-xl shadow-2xl p-6 animate-scale-in">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-bold text-gray-800">Change Material</h3>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
+                </div>
+                
+                <div className="mb-6">
+                    <div className="text-sm text-gray-500 mb-4">
+                        Updating material for order <span className="font-mono font-bold text-gray-700">{order.id}</span>
+                        <br/>
+                        Client: {order.clientName}
+                    </div>
+
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">New Material Type</label>
+                    <select 
+                        className="w-full border p-3 rounded-lg bg-gray-50 focus:bg-white focus:ring-2 focus:ring-primary/20 outline-none"
+                        value={material}
+                        onChange={(e) => setMaterial(e.target.value)}
+                    >
+                         {Object.values(ScrapType).map(type => (
+                             <option key={type} value={type}>{type}</option>
+                         ))}
+                    </select>
+                </div>
+
                 <div className="flex gap-3 justify-end">
-                    <Button fullWidth variant="secondary" onClick={onClose}>Cancel</Button>
-                    <Button fullWidth variant="success" onClick={handleSave} disabled={!gross || !tare}>Save</Button>
+                    <Button variant="secondary" onClick={onClose}>Cancel</Button>
+                    <Button variant="primary" onClick={handleSave}>Save Changes</Button>
                 </div>
             </div>
         </div>

@@ -28,7 +28,7 @@ export const MobileLayout: React.FC<{ children: React.ReactNode, title: string, 
   );
 };
 
-interface Tab { id: string; label: string; }
+export interface Tab { id: string; label: string; mobileLabel?: string; count?: number; }
 
 export const WebLayout: React.FC<{ 
   children: React.ReactNode, 
@@ -62,9 +62,14 @@ export const WebLayout: React.FC<{
             <button
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
-              className={`w-full text-left px-4 py-3 rounded-xl transition-all ${currentTab === tab.id ? 'bg-primary text-white font-bold shadow-lg shadow-primary/30 transform scale-105' : 'text-slate-300 hover:bg-white/10'}`}
+              className={`w-full text-left px-4 py-3 rounded-xl transition-all flex items-center justify-between group ${currentTab === tab.id ? 'bg-primary text-white font-bold shadow-lg shadow-primary/30 transform scale-105' : 'text-slate-300 hover:bg-white/10'}`}
             >
-              {tab.label}
+              <span>{tab.label}</span>
+              {tab.count !== undefined && tab.count > 0 && (
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ml-2 ${currentTab === tab.id ? 'bg-white text-primary' : 'bg-red-500 text-white'}`}>
+                      {tab.count}
+                  </span>
+              )}
             </button>
           ))}
         </nav>
@@ -96,10 +101,15 @@ export const WebLayout: React.FC<{
             <button 
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
-              className={`p-2 flex-1 rounded-lg text-xs font-bold whitespace-nowrap transition-colors flex flex-col items-center gap-1 ${currentTab === tab.id ? 'text-primary bg-blue-50' : 'text-slate-400'}`}
+              className={`p-2 flex-1 rounded-lg text-xs font-bold whitespace-nowrap transition-colors flex flex-col items-center gap-1 relative ${currentTab === tab.id ? 'text-primary bg-blue-50' : 'text-slate-400'}`}
             >
               <div className={`w-1 h-1 rounded-full ${currentTab === tab.id ? 'bg-primary' : 'bg-transparent'}`} />
-              {tab.label}
+              {tab.mobileLabel || tab.label}
+              {tab.count !== undefined && tab.count > 0 && (
+                  <span className="absolute top-1 right-2 min-w-[16px] h-4 bg-red-500 text-white text-[10px] flex items-center justify-center rounded-full px-1 shadow-sm">
+                      {tab.count}
+                  </span>
+              )}
             </button>
          ))}
       </div>
