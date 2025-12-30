@@ -855,7 +855,6 @@ const RegistryTable: React.FC<{ orders: Order[] }> = ({ orders }) => {
 };
 
 const ReportsView: React.FC<{ orders: Order[] }> = ({ orders }) => {
-    // ... existing logic same, just responsive tweaks
     const [materialFilter, setMaterialFilter] = useState('');
     const [startDate, setStartDate] = useState('');
     const [sortConfig, setSortConfig] = useState<SortConfig | null>({ key: 'weightRecord.timestamp', direction: 'desc' });
@@ -956,9 +955,9 @@ const ReportsView: React.FC<{ orders: Order[] }> = ({ orders }) => {
                         <table className="w-full text-left text-sm">
                             <thead className="bg-gray-50 border-b border-gray-200">
                                 <tr>
-                                    <th className="p-3">Date</th>
-                                    <th className="p-3">Client</th>
-                                    <th className="p-3 text-right">Net</th>
+                                    <SortableHeader label="Date" sortKey="weightRecord.timestamp" currentSort={sortConfig} onSort={handleSort} />
+                                    <SortableHeader label="Client" sortKey="clientName" currentSort={sortConfig} onSort={handleSort} />
+                                    <SortableHeader label="Net" sortKey="weightRecord.net" currentSort={sortConfig} onSort={handleSort} align="right" />
                                 </tr>
                             </thead>
                             <tbody>
@@ -1170,7 +1169,7 @@ const WeighbridgeModal: React.FC<{ order: Order, onClose: () => void, onSuccess:
     const [gross, setGross] = useState<string>(order.weightRecord?.gross && order.weightRecord.gross > 0 ? order.weightRecord.gross.toString() : '');
     const [tare, setTare] = useState<string>(order.weightRecord?.tare && order.weightRecord.tare > 0 ? order.weightRecord.tare.toString() : '');
     const [ticket, setTicket] = useState<string>(order.weightRecord?.ticketNumber || '');
-    const [material, setMaterial] = useState<string>(order.scrapType);
+    const [material] = useState<string>(order.scrapType);
 
     const net = (parseFloat(gross) || 0) - (parseFloat(tare) || 0);
 
