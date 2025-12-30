@@ -43,87 +43,128 @@ export const DriverApp: React.FC<DriverAppProps> = ({ user, onLogout }) => {
   }
 
   return (
-    <MobileLayout title="My Orders" isDark={darkMode}>
-      <div className="flex justify-between items-center mb-6">
-        <div className="text-sm opacity-70">Welcome, {user.name}</div>
-        <div className="flex gap-2">
-            <button onClick={() => setDarkMode(!darkMode)} className="p-2 bg-gray-200 dark:bg-slate-700 rounded-full">
-                {darkMode ? '☀️' : '🌙'}
+    <MobileLayout title="My Schedule" isDark={darkMode}>
+      <div className="flex justify-between items-end mb-6 px-1">
+        <div>
+            <div className="text-xs font-bold uppercase tracking-wider opacity-60 mb-1">Driver</div>
+            <div className="text-2xl font-bold leading-none">{user.name}</div>
+        </div>
+        <div className="flex gap-3">
+            <button onClick={() => setDarkMode(!darkMode)} className={`p-3 rounded-full shadow-sm transition-transform active:scale-90 ${darkMode ? 'bg-slate-800 text-yellow-400' : 'bg-white text-slate-600'}`}>
+                {darkMode ? '🌙' : '☀️'}
             </button>
-            <button onClick={onLogout} className="text-xs underline text-red-500">Logout</button>
+            <button onClick={onLogout} className="p-3 bg-red-50 text-red-500 rounded-full shadow-sm active:scale-90 font-bold text-xs">
+                EXIT
+            </button>
         </div>
       </div>
 
       {loading ? (
-        <div className="text-center py-10">Loading...</div>
+        <div className="text-center py-20 opacity-50 animate-pulse">Loading orders...</div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-5">
           {orders.filter(o => o.status !== OrderStatus.COMPLETED).length === 0 && (
-            <div className="text-center py-10 text-gray-500">No active orders for today. Good job!</div>
+            <div className="text-center py-10">
+                <div className="text-6xl mb-4">🎉</div>
+                <div className="text-xl font-bold opacity-80">All done for now!</div>
+                <div className="text-sm opacity-50">Enjoy your break.</div>
+            </div>
           )}
           
-          {orders.map(order => (
-            <div 
-              key={order.id} 
-              onClick={() => setActiveOrderId(order.id)}
-              className={`p-4 rounded-xl shadow-md border-l-4 cursor-pointer transition-transform active:scale-95 ${
-                darkMode ? 'bg-secondary border-slate-700' : 'bg-white'
-              } ${
-                order.status === OrderStatus.PLANNED ? 'border-gray-400' :
-                order.status === OrderStatus.ISSUE ? 'border-red-500' :
-                order.status === OrderStatus.COMPLETED ? 'border-green-500' :
-                order.type === OrderType.DELIVERY ? 'border-orange-500' : 'border-primary'
-              }`}
-            >
-              <div className="flex justify-between items-start mb-2">
-                <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${STATUS_COLORS[order.status]}`}>
-                  {STATUS_LABELS[order.status]}
-                </span>
-                <span className="text-xs font-mono opacity-60">{order.timeWindow}</span>
-              </div>
-              <div className="flex items-center gap-2 mb-1">
-                 {order.type === OrderType.DELIVERY ? (
-                     <span className="bg-orange-100 text-orange-800 text-xs px-2 py-0.5 rounded font-bold border border-orange-200">DELIVERY ⬆️</span>
-                 ) : (
-                     <span className="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded font-bold border border-blue-200">COLLECTION ⬇️</span>
-                 )}
-              </div>
-              <h3 className="font-bold text-lg mb-1">{order.clientName}</h3>
-              <p className="text-sm opacity-80 mb-2">{order.address}</p>
-              <div className="flex justify-between items-center text-sm mt-3 pt-3 border-t border-gray-100 dark:border-slate-700">
-                <span className="font-medium text-primary">
-                    {order.containerSize ? `${order.containerSize} ` : ''} 
-                    {order.scrapType}
-                </span>
-                <span className="font-mono opacity-50">{order.truckType === 'Skip Lorry' ? 'SKIP' : 'HOOK'}</span>
-              </div>
-            </div>
-          ))}
+          {orders.map(order => {
+             const isDelivery = order.type === OrderType.DELIVERY;
+             const isCompleted = order.status === OrderStatus.COMPLETED;
+             
+             return (
+                <div 
+                key={order.id} 
+                onClick={() => setActiveOrderId(order.id)}
+                className={`group relative overflow-hidden rounded-3xl p-5 shadow-lg transition-all active:scale-[0.98] ${
+                    darkMode ? 'bg-slate-800 shadow-slate-900/50' : 'bg-white shadow-slate-200/50'
+                } ${isCompleted ? 'opacity-60 grayscale' : ''}`}
+                >
+                {/* Status Badge */}
+                <div className="flex justify-between items-start mb-3">
+                    <div className={`px-3 py-1.5 rounded-full text-xs font-extrabold uppercase tracking-wide shadow-sm ${STATUS_COLORS[order.status]}`}>
+                        {STATUS_LABELS[order.status]}
+                    </div>
+                    <div className="text-xs font-bold font-mono opacity-50 bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded-md">
+                        {order.timeWindow}
+                    </div>
+                </div>
 
-          {/* History Section Header */}
-          <div className="pt-8 pb-2 font-bold text-lg opacity-60">History (Today)</div>
-          {orders.filter(o => o.status === OrderStatus.COMPLETED).map(order => (
-             <div key={order.id} className="opacity-60 bg-gray-100 dark:bg-slate-800 p-4 rounded-lg">
-                <div className="flex justify-between">
-                    <span className="font-bold">{order.clientName}</span>
-                    <span className="text-green-600 font-bold">✓</span>
+                {/* Main Content */}
+                <div className="flex gap-4 items-center mb-3">
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shadow-inner ${
+                        isDelivery ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'
+                    }`}>
+                        {isDelivery ? '⬇️' : '♻️'}
+                    </div>
+                    <div>
+                        <h3 className="font-bold text-xl leading-tight mb-1">{order.clientName}</h3>
+                        <p className="text-sm font-medium opacity-70 line-clamp-1">{order.address}</p>
+                    </div>
                 </div>
-                <div className="text-xs mt-1">
-                    {order.type === OrderType.DELIVERY ? 'Container Dropped' : `Net: ${order.weightRecord?.net} kg`}
+
+                {/* Footer Info */}
+                <div className={`flex justify-between items-center text-sm pt-4 border-t ${darkMode ? 'border-slate-700' : 'border-slate-100'}`}>
+                    <div className="flex items-center gap-2">
+                        <span className={`font-bold ${isDelivery ? 'text-orange-500' : 'text-primary'}`}>
+                            {order.containerSize ? `${order.containerSize}` : ''} {order.scrapType}
+                        </span>
+                    </div>
+                    <div className="font-bold text-xs bg-slate-100 dark:bg-slate-900 px-2 py-1 rounded text-slate-500">
+                        {order.truckType === 'Skip Lorry' ? 'SKIP' : 'HOOK'}
+                    </div>
                 </div>
-             </div>
-          ))}
+                
+                {/* Arrow indicator */}
+                <div className="absolute right-4 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity text-slate-300">
+                    ➔
+                </div>
+                </div>
+             );
+          })}
         </div>
       )}
     </MobileLayout>
   );
 };
 
-// Sub-component for Active Order Detail
+// --- Sub-component: Toggle Row for Checklists ---
+const ToggleRow: React.FC<{ 
+    checked: boolean; 
+    onChange: (val: boolean) => void; 
+    label: string; 
+    icon: string;
+    colorClass: string;
+    isDark?: boolean;
+}> = ({ checked, onChange, label, icon, colorClass, isDark }) => (
+    <div 
+        onClick={() => onChange(!checked)}
+        className={`flex items-center gap-4 p-4 rounded-2xl border-2 transition-all cursor-pointer select-none active:scale-95 ${
+            checked 
+                ? `${colorClass} border-transparent shadow-md` 
+                : `${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-100'}`
+        }`}
+    >
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-lg ${checked ? 'bg-white/20' : 'bg-slate-100 dark:bg-slate-700'}`}>
+            {checked ? '✓' : icon}
+        </div>
+        <span className={`font-bold text-lg flex-1 ${checked ? 'text-white' : ''}`}>{label}</span>
+        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+            checked ? 'bg-white border-white' : 'border-slate-300'
+        }`}>
+            {checked && <div className="w-3 h-3 rounded-full bg-current opacity-50" />}
+        </div>
+    </div>
+);
+
+
+// --- Sub-component: Active Order Detail ---
 const ActiveOrderView: React.FC<{ order: Order, onBack: () => void, onUpdate: () => void, isDark: boolean }> = ({ order, onBack, onUpdate, isDark }) => {
   const [weightData, setWeightData] = useState({ estimated: '', ticket: '' });
   const [checklist, setChecklist] = useState({ ppe: false, vehicle: false, docs: false });
-  // Delivery specific checklist
   const [deliveryChecklist, setDeliveryChecklist] = useState({ groundStable: false, doorsLocked: false, customerApproved: false });
   
   const [issueModalOpen, setIssueModalOpen] = useState(false);
@@ -146,189 +187,189 @@ const ActiveOrderView: React.FC<{ order: Order, onBack: () => void, onUpdate: ()
     setIssueModalOpen(false);
   };
 
-  // Embed Google Maps iframe URL
   const mapUrl = `https://maps.google.com/maps?q=${encodeURIComponent(order.address)}&t=&z=14&ie=UTF8&iwloc=&output=embed`;
 
   return (
-    <MobileLayout title={isDelivery ? "Delivery Details" : "Collection Details"} onBack={onBack} isDark={isDark}>
+    <MobileLayout title={isDelivery ? "Drop-off" : "Collection"} onBack={onBack} isDark={isDark}>
         
-        {/* Info Card */}
-        <div className={`p-4 rounded-xl mb-6 shadow-sm border-l-4 ${isDelivery ? 'border-orange-500' : 'border-primary'} ${isDark ? 'bg-secondary' : 'bg-white'}`}>
-            <div className="flex justify-between items-start mb-2">
-                 <h2 className="text-2xl font-bold mb-1">{order.clientName}</h2>
-                 {isDelivery ? 
-                    <span className="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded font-bold border border-orange-200">DELIVERY</span> :
-                    <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded font-bold border border-blue-200">PICKUP</span>
-                 }
+        {/* Top Card */}
+        <div className={`relative p-5 rounded-3xl mb-6 shadow-xl overflow-hidden ${isDark ? 'bg-slate-800 text-white' : 'bg-white text-slate-900'}`}>
+            <div className={`absolute top-0 left-0 w-2 h-full ${isDelivery ? 'bg-orange-500' : 'bg-primary'}`} />
+            
+            <div className="pl-4">
+                <div className="flex justify-between items-start mb-2">
+                    <span className={`text-xs font-black uppercase tracking-wider px-2 py-1 rounded bg-slate-100 dark:bg-slate-700 text-slate-500`}>
+                        {isDelivery ? 'DELIVERY' : 'PICKUP'}
+                    </span>
+                    <button onClick={openExternalNav} className="text-blue-500 font-bold text-sm flex items-center gap-1 bg-blue-50 px-3 py-1 rounded-full active:bg-blue-100">
+                        <span>🗺️</span> GO
+                    </button>
+                </div>
+                
+                <h2 className="text-2xl font-black leading-tight mb-1">{order.clientName}</h2>
+                <p className="text-lg opacity-80 font-medium mb-4">{order.address}</p>
+
+                <div className="grid grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-xl">
+                    <div>
+                        <div className="text-xs uppercase opacity-50 font-bold">Cargo</div>
+                        <div className="font-bold text-lg">{order.scrapType}</div>
+                    </div>
+                    <div>
+                        <div className="text-xs uppercase opacity-50 font-bold">Size</div>
+                        <div className="font-bold text-lg">{order.containerSize || 'Std'}</div>
+                    </div>
+                </div>
             </div>
             
-            <p className="text-lg mb-4">{order.address}</p>
-            
-            {/* Embedded Map */}
-            <div className="w-full h-48 bg-gray-200 rounded-lg overflow-hidden mb-4 border border-gray-300 relative">
+            {/* Map Preview */}
+            <div className="mt-4 h-32 w-full rounded-xl overflow-hidden shadow-inner relative border border-slate-200 dark:border-slate-700">
+                 <div className="absolute inset-0 z-10 bg-transparent pointer-events-none shadow-[inset_0_0_20px_rgba(0,0,0,0.1)]"></div>
                  <iframe 
                     width="100%" 
                     height="100%" 
                     src={mapUrl}
                     frameBorder="0" 
                     scrolling="no" 
-                    marginHeight={0} 
-                    marginWidth={0}
-                    className="absolute inset-0"
+                    className="opacity-80 grayscale-[50%]"
                     title="Map Location"
                  ></iframe>
             </div>
-
-            <div className="grid grid-cols-2 gap-4 text-sm mb-4">
-                <div>
-                    <div className="opacity-60">{isDelivery ? 'Dropping:' : 'Collecting:'}</div>
-                    <div className="font-bold text-lg">{order.scrapType}</div>
-                </div>
-                <div>
-                    <div className="opacity-60">Truck / Size:</div>
-                    <div className="font-bold">
-                        {order.truckType} <br/>
-                        <span className={`text-lg ${isDelivery ? 'text-orange-600' : 'text-primary'}`}>{order.containerSize || 'Standard'}</span>
-                    </div>
-                </div>
-            </div>
-
-            <Button variant="outline" fullWidth onClick={openExternalNav} className="mb-2">
-                🚀 Launch GPS App
-            </Button>
-            
-            <div className="grid grid-cols-2 gap-2">
-                <Button variant="success" size="sm" onClick={() => setCompleteModalOpen(true)}>
-                    ✅ Complete Order
-                </Button>
-                <Button variant="danger" size="sm" onClick={() => setIssueModalOpen(true)}>
-                    ⚠️ Report Issue
-                </Button>
-            </div>
         </div>
 
-        {/* Workflow Steps */}
-        <div className="space-y-6">
+        {/* Workflow Container */}
+        <div className="pb-24">
             
-            {/* Step 1: Checklist & Start */}
+            {/* Step 1: Checklist */}
             {order.status === OrderStatus.PLANNED && (
-                <div className="animate-fade-in">
-                    <h3 className="font-bold mb-3">1. Safety Checklist</h3>
-                    <div className={`space-y-3 p-4 rounded-lg mb-4 ${isDark ? 'bg-secondary border border-gray-700' : 'bg-white'}`}>
-                        <label className="flex items-center gap-3 p-2">
-                            <input type="checkbox" className="w-6 h-6 accent-primary" checked={checklist.ppe} onChange={e => setChecklist({...checklist, ppe: e.target.checked})} />
-                            <span>🦺 I have PPE (Helmet & Vest)</span>
-                        </label>
-                        <label className="flex items-center gap-3 p-2">
-                            <input type="checkbox" className="w-6 h-6 accent-primary" checked={checklist.vehicle} onChange={e => setChecklist({...checklist, vehicle: e.target.checked})} />
-                            <span>🚛 Vehicle Check OK</span>
-                        </label>
-                        <label className="flex items-center gap-3 p-2">
-                            <input type="checkbox" className="w-6 h-6 accent-primary" checked={checklist.docs} onChange={e => setChecklist({...checklist, docs: e.target.checked})} />
-                            <span>📄 Transport Documents</span>
-                        </label>
-                    </div>
-                    <Button 
-                        fullWidth size="xl" variant="primary"
-                        disabled={!checklist.ppe || !checklist.vehicle || !checklist.docs}
-                        onClick={() => handleStatusChange(OrderStatus.IN_TRANSIT, { checklist })}
-                    >
-                        START ROUTE ▶
-                    </Button>
+                <div className="animate-fade-in space-y-3">
+                    <h3 className="font-bold text-xl mb-2 px-1">Safety Check</h3>
+                    <ToggleRow 
+                        checked={checklist.ppe} onChange={v => setChecklist({...checklist, ppe: v})}
+                        label="PPE Equipment" icon="🦺" colorClass="bg-blue-500 border-blue-600" isDark={isDark}
+                    />
+                    <ToggleRow 
+                        checked={checklist.vehicle} onChange={v => setChecklist({...checklist, vehicle: v})}
+                        label="Vehicle Safe" icon="🚛" colorClass="bg-blue-500 border-blue-600" isDark={isDark}
+                    />
+                    <ToggleRow 
+                        checked={checklist.docs} onChange={v => setChecklist({...checklist, docs: v})}
+                        label="Documents" icon="📄" colorClass="bg-blue-500 border-blue-600" isDark={isDark}
+                    />
                 </div>
             )}
 
-            {/* Step 2: In Transit */}
+            {/* Step 2: Transit */}
             {order.status === OrderStatus.IN_TRANSIT && (
-                <div className="animate-fade-in text-center">
-                    <div className="text-6xl mb-4">🚛</div>
-                    <p className="mb-6 opacity-80">You are on the way to the client.</p>
-                    <Button fullWidth size="xl" variant="success" onClick={() => handleStatusChange(OrderStatus.ON_SITE)}>
-                        I'VE ARRIVED 🏁
-                    </Button>
+                <div className="animate-fade-in text-center py-10">
+                    <div className="inline-block p-6 rounded-full bg-blue-50 dark:bg-slate-800 mb-6 animate-bounce">
+                        <span className="text-6xl">🚛</span>
+                    </div>
+                    <h3 className="text-2xl font-black mb-2">Driving...</h3>
+                    <p className="opacity-60 text-lg">Focus on the road.</p>
                 </div>
             )}
 
-            {/* Step 3: On Site (Loading/Unloading) */}
+            {/* Step 3: On Site */}
             {order.status === OrderStatus.ON_SITE && (
-                <div className="animate-fade-in text-center">
-                    <div className="text-6xl mb-4">{isDelivery ? '⬇️' : '🏗️'}</div>
-                    <h3 className="text-xl font-bold mb-2">
-                        {isDelivery ? `Dropping ${order.containerSize || 'Bin'}` : 'Loading Scrap'}
-                    </h3>
-                    <p className="mb-6 opacity-80">
-                        {isDelivery 
-                            ? 'Positioning the container carefully. Ensure safety zone.' 
-                            : 'Loading scrap at client site...'}
+                <div className="animate-fade-in text-center py-6">
+                     <div className="inline-block p-6 rounded-full bg-yellow-50 dark:bg-slate-800 mb-6">
+                        <span className="text-6xl">{isDelivery ? '⬇️' : '🏗️'}</span>
+                    </div>
+                    <h3 className="text-2xl font-black mb-2">{isDelivery ? 'Dropping Off' : 'Loading...'}</h3>
+                    <p className="opacity-60 text-lg px-8">
+                        {isDelivery ? 'Place container safely.' : 'Load material according to safety rules.'}
                     </p>
-                    <Button fullWidth size="xl" variant="primary" onClick={() => handleStatusChange(OrderStatus.ON_SCALE)}>
-                        {isDelivery ? 'CONTAINER PLACED ✅' : 'LOADING COMPLETE 📦'}
-                    </Button>
                 </div>
             )}
 
-            {/* Step 4: Action Confirmation */}
+            {/* Step 4: Verification */}
             {order.status === OrderStatus.ON_SCALE && (
-                <div className="animate-fade-in">
-                    <h3 className="font-bold mb-3">{isDelivery ? 'Drop-off Confirmation' : 'Pickup Confirmation'}</h3>
+                <div className="animate-fade-in space-y-4">
+                    <h3 className="font-bold text-xl mb-2 px-1">{isDelivery ? 'Drop Confirmation' : 'Load Details'}</h3>
                     
                     {isDelivery ? (
-                         // DELIVERY VIEW
-                         <div className={`p-4 rounded-lg space-y-4 mb-4 ${isDark ? 'bg-secondary border border-gray-700' : 'bg-white'}`}>
-                            <div className="p-3 bg-orange-50 border border-orange-100 rounded text-orange-900 text-sm mb-2">
-                                <strong>Safety Protocol:</strong> Ensure container is on flat ground and doors are secure.
-                            </div>
-                            
-                            <label className="flex items-center gap-3 p-2 border-b border-gray-100">
-                                <input type="checkbox" className="w-6 h-6 accent-orange-500" checked={deliveryChecklist.groundStable} onChange={e => setDeliveryChecklist({...deliveryChecklist, groundStable: e.target.checked})} />
-                                <span>Ground is stable & flat</span>
-                            </label>
-                             <label className="flex items-center gap-3 p-2 border-b border-gray-100">
-                                <input type="checkbox" className="w-6 h-6 accent-orange-500" checked={deliveryChecklist.doorsLocked} onChange={e => setDeliveryChecklist({...deliveryChecklist, doorsLocked: e.target.checked})} />
-                                <span>Doors/Locks secured</span>
-                            </label>
-                             <label className="flex items-center gap-3 p-2">
-                                <input type="checkbox" className="w-6 h-6 accent-orange-500" checked={deliveryChecklist.customerApproved} onChange={e => setDeliveryChecklist({...deliveryChecklist, customerApproved: e.target.checked})} />
-                                <span>Customer approved placement</span>
-                            </label>
+                         <div className="space-y-3">
+                            <ToggleRow 
+                                checked={deliveryChecklist.groundStable} onChange={v => setDeliveryChecklist({...deliveryChecklist, groundStable: v})}
+                                label="Ground Stable" icon="⛰️" colorClass="bg-orange-500 border-orange-600" isDark={isDark}
+                            />
+                            <ToggleRow 
+                                checked={deliveryChecklist.doorsLocked} onChange={v => setDeliveryChecklist({...deliveryChecklist, doorsLocked: v})}
+                                label="Doors Secured" icon="🔒" colorClass="bg-orange-500 border-orange-600" isDark={isDark}
+                            />
+                            <ToggleRow 
+                                checked={deliveryChecklist.customerApproved} onChange={v => setDeliveryChecklist({...deliveryChecklist, customerApproved: v})}
+                                label="Client Approved" icon="👍" colorClass="bg-orange-500 border-orange-600" isDark={isDark}
+                            />
                          </div>
                     ) : (
-                        // COLLECTION VIEW
-                        <div className={`p-4 rounded-lg space-y-4 mb-4 ${isDark ? 'bg-secondary border border-gray-700' : 'bg-white'}`}>
-                            <p className="text-sm opacity-70 italic">
-                                Enter the Collection Note number below. Exact weighing will take place at the depot.
-                            </p>
+                        <div className={`p-5 rounded-2xl shadow-sm space-y-5 ${isDark ? 'bg-slate-800' : 'bg-white'}`}>
                             <div>
-                                <label className="block text-sm opacity-70 mb-1">Collection Note / Ticket No.</label>
+                                <label className="block text-xs font-bold uppercase tracking-wider opacity-60 mb-2">Ticket Number</label>
                                 <input 
                                     type="text" 
-                                    className="w-full p-3 rounded bg-transparent border border-gray-400 font-mono"
+                                    className="w-full p-4 rounded-xl bg-slate-100 dark:bg-slate-900 border-2 border-transparent focus:border-primary text-2xl font-mono text-center outline-none"
                                     value={weightData.ticket}
                                     onChange={e => setWeightData({...weightData, ticket: e.target.value})}
-                                    placeholder="e.g. WZ-1234"
+                                    placeholder="----"
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm opacity-70 mb-1">Estimated Weight (kg) - Optional</label>
+                                <label className="block text-xs font-bold uppercase tracking-wider opacity-60 mb-2">Est. Weight (kg)</label>
                                 <input 
                                     type="number" 
-                                    className="w-full p-3 rounded bg-transparent border border-gray-400 font-mono text-xl"
+                                    className="w-full p-4 rounded-xl bg-slate-100 dark:bg-slate-900 border-2 border-transparent focus:border-primary text-2xl font-mono text-center outline-none"
                                     value={weightData.estimated}
                                     onChange={e => setWeightData({...weightData, estimated: e.target.value})}
-                                    placeholder="~"
+                                    placeholder="0"
                                 />
                             </div>
                         </div>
                     )}
                     
-                    <div className="grid grid-cols-2 gap-2 mb-4">
-                        <Button variant="secondary" size="sm">📷 {isDelivery ? 'Placement Photo' : 'Cargo Photo'}</Button>
-                        <Button variant="secondary" size="sm">✍️ Signature</Button>
+                    <div className="grid grid-cols-2 gap-3 mt-4">
+                        <Button variant="outline" size="lg" className="flex flex-col gap-1 h-auto py-3">
+                            <span className="text-2xl">📷</span>
+                            <span className="text-xs">Photo</span>
+                        </Button>
+                        <Button variant="outline" size="lg" className="flex flex-col gap-1 h-auto py-3">
+                            <span className="text-2xl">✍️</span>
+                            <span className="text-xs">Sign</span>
+                        </Button>
                     </div>
+                </div>
+            )}
+        </div>
 
+        {/* --- FIXED BOTTOM ACTION BAR --- */}
+        <div className={`fixed bottom-0 left-0 right-0 p-4 border-t backdrop-blur-xl z-30 transition-all ${
+            isDark ? 'bg-slate-900/90 border-slate-700' : 'bg-white/90 border-slate-200'
+        }`}>
+            <div className="max-w-lg mx-auto flex gap-3">
+                {order.status === OrderStatus.PLANNED && (
+                     <Button 
+                        fullWidth size="xl" variant="primary" 
+                        disabled={!checklist.ppe || !checklist.vehicle || !checklist.docs}
+                        onClick={() => handleStatusChange(OrderStatus.IN_TRANSIT, { checklist })}
+                        className="shadow-xl shadow-blue-500/30"
+                    >
+                        START ROUTE ▶
+                    </Button>
+                )}
+                {order.status === OrderStatus.IN_TRANSIT && (
+                    <Button fullWidth size="xl" variant="success" onClick={() => handleStatusChange(OrderStatus.ON_SITE)} className="shadow-xl shadow-green-500/30">
+                        I'VE ARRIVED 🏁
+                    </Button>
+                )}
+                {order.status === OrderStatus.ON_SITE && (
+                    <Button fullWidth size="xl" variant="primary" onClick={() => handleStatusChange(OrderStatus.ON_SCALE)} className="shadow-xl shadow-blue-500/30">
+                        DONE {isDelivery ? 'DROPPING' : 'LOADING'}
+                    </Button>
+                )}
+                {order.status === OrderStatus.ON_SCALE && (
                     <Button 
-                        fullWidth size="xl" variant={isDelivery ? "secondary" : "success"} // Use secondary/orange styled if needed or just success
-                        className={isDelivery ? "bg-orange-600 hover:bg-orange-700 text-white" : ""}
+                        fullWidth size="xl" variant={isDelivery ? "secondary" : "success"}
+                        className={`${isDelivery ? "bg-orange-500 hover:bg-orange-600 text-white shadow-orange-500/30" : "shadow-green-500/30"} shadow-xl`}
                         disabled={isDelivery && (!deliveryChecklist.groundStable || !deliveryChecklist.doorsLocked || !deliveryChecklist.customerApproved)}
                         onClick={() => handleStatusChange(OrderStatus.COMPLETED, {
                             weightRecord: {
@@ -340,50 +381,61 @@ const ActiveOrderView: React.FC<{ order: Order, onBack: () => void, onUpdate: ()
                             }
                         })}
                     >
-                        {isDelivery ? 'CONFIRM DROP-OFF' : 'CONFIRM PICKUP ✅'}
+                        CONFIRM {isDelivery ? 'DROP' : 'PICKUP'} ✓
                     </Button>
-                </div>
-            )}
+                )}
 
-             {/* Complete Order Modal */}
-             {completeModalOpen && (
-                 <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 z-50">
-                     <div className={`w-full max-w-sm p-6 rounded-lg ${isDark ? 'bg-secondary' : 'bg-white'}`}>
-                         <h3 className="font-bold text-lg mb-4">Complete Order</h3>
-                         <p className="mb-4 text-sm opacity-80">
-                            Are you sure you want to mark this order as completed?
-                            {order.status !== OrderStatus.ON_SCALE && <span className="block text-orange-500 mt-2 font-bold">Warning: Standard flow was skipped.</span>}
-                         </p>
-                         <div className="flex gap-2">
-                             <Button fullWidth variant="secondary" onClick={() => setCompleteModalOpen(false)}>Cancel</Button>
-                             <Button fullWidth variant="success" onClick={() => {
-                                 handleStatusChange(OrderStatus.COMPLETED);
-                                 setCompleteModalOpen(false);
-                             }}>Confirm</Button>
-                         </div>
-                     </div>
-                 </div>
-             )}
-
-             {/* Issue Modal */}
-             {issueModalOpen && (
-                 <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 z-50">
-                     <div className={`w-full max-w-sm p-6 rounded-lg ${isDark ? 'bg-secondary' : 'bg-white'}`}>
-                         <h3 className="font-bold text-lg mb-4">Report Issue</h3>
-                         <textarea 
-                            className="w-full h-32 p-3 border rounded mb-4 text-slate-900"
-                            placeholder="Describe the situation (breakdown, gate closed, etc.)"
-                            value={issueText}
-                            onChange={e => setIssueText(e.target.value)}
-                         />
-                         <div className="flex gap-2">
-                             <Button fullWidth variant="secondary" onClick={() => setIssueModalOpen(false)}>Cancel</Button>
-                             <Button fullWidth variant="danger" onClick={submitIssue}>Send</Button>
-                         </div>
-                     </div>
+                {/* Always visible secondary options if not completed */}
+                {order.status !== OrderStatus.PLANNED && (
+                    <button 
+                        onClick={() => setIssueModalOpen(true)}
+                        className="w-16 flex-shrink-0 bg-red-100 text-red-600 rounded-2xl flex items-center justify-center text-xl font-bold active:scale-95 transition-transform"
+                    >
+                        !
+                    </button>
+                )}
+            </div>
+             {order.status === OrderStatus.PLANNED && (
+                 <div className="text-center mt-2">
+                     <button onClick={() => setIssueModalOpen(true)} className="text-xs font-bold text-red-400 p-2">Report Issue</button>
                  </div>
              )}
         </div>
+
+         {/* Complete/Cancel Modals (Simplified for mobile) */}
+         {completeModalOpen && (
+             <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4 pb-10">
+                 <div className={`w-full max-w-sm p-6 rounded-3xl animate-slide-up ${isDark ? 'bg-slate-800' : 'bg-white'}`}>
+                     <h3 className="font-bold text-2xl mb-4">Complete Order?</h3>
+                     <div className="flex flex-col gap-3">
+                         <Button fullWidth variant="success" size="lg" onClick={() => {
+                             handleStatusChange(OrderStatus.COMPLETED);
+                             setCompleteModalOpen(false);
+                         }}>Yes, Complete</Button>
+                         <Button fullWidth variant="secondary" size="lg" onClick={() => setCompleteModalOpen(false)}>Cancel</Button>
+                     </div>
+                 </div>
+             </div>
+         )}
+
+         {/* Issue Modal */}
+         {issueModalOpen && (
+             <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4 pb-0">
+                 <div className={`w-full max-w-sm p-6 rounded-t-3xl sm:rounded-3xl animate-slide-up ${isDark ? 'bg-slate-800' : 'bg-white'}`}>
+                     <div className="flex justify-between items-center mb-4">
+                        <h3 className="font-bold text-xl">Report Issue</h3>
+                        <button onClick={() => setIssueModalOpen(false)} className="p-2 bg-slate-100 rounded-full w-8 h-8 flex items-center justify-center">✕</button>
+                     </div>
+                     <textarea 
+                        className="w-full h-40 p-4 border-2 border-slate-200 rounded-2xl mb-4 text-slate-900 text-lg focus:border-red-500 outline-none"
+                        placeholder="What went wrong?"
+                        value={issueText}
+                        onChange={e => setIssueText(e.target.value)}
+                     />
+                     <Button fullWidth variant="danger" size="lg" onClick={submitIssue} className="mb-6">Send Report</Button>
+                 </div>
+             </div>
+         )}
     </MobileLayout>
   );
 };

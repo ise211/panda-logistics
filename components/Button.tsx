@@ -14,21 +14,21 @@ export const Button: React.FC<ButtonProps> = ({
   className = '',
   ...props 
 }) => {
-  const baseStyles = "inline-flex items-center justify-center font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg";
+  const baseStyles = "inline-flex items-center justify-center font-bold transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed rounded-2xl active:scale-95 shadow-sm";
   
   const variants = {
-    primary: "bg-primary text-slate-900 hover:bg-yellow-400 focus:ring-yellow-500",
-    secondary: "bg-secondary text-white hover:bg-slate-700 focus:ring-slate-500",
-    danger: "bg-red-600 text-white hover:bg-red-700 focus:ring-red-500",
-    success: "bg-green-600 text-white hover:bg-green-700 focus:ring-green-500",
-    outline: "border-2 border-slate-300 text-slate-700 hover:bg-slate-50 focus:ring-slate-500",
+    primary: "bg-gradient-to-br from-primary to-blue-600 text-white hover:to-blue-700 shadow-blue-200/50",
+    secondary: "bg-slate-100 text-slate-800 hover:bg-slate-200 border border-slate-200 dark:bg-slate-700 dark:text-white dark:border-slate-600",
+    danger: "bg-red-500 text-white hover:bg-red-600 shadow-red-200/50",
+    success: "bg-green-500 text-white hover:bg-green-600 shadow-green-200/50",
+    outline: "border-2 border-slate-300 text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:border-slate-600 dark:hover:bg-slate-800",
   };
 
   const sizes = {
-    sm: "px-3 py-1.5 text-sm",
-    md: "px-4 py-2 text-base",
-    lg: "px-6 py-3 text-lg",
-    xl: "px-8 py-4 text-xl font-bold", // Optimized for driver gloves/fat fingers
+    sm: "px-3 py-2 text-sm",
+    md: "px-5 py-3 text-base",
+    lg: "px-6 py-4 text-lg",
+    xl: "px-6 py-4 text-lg md:text-xl uppercase tracking-wide", // Optimized for driver gloves
   };
 
   return (
