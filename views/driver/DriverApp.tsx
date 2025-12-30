@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { User, Order, OrderStatus, OrderType } from '../../types';
-import { getOrdersByDriver, updateOrderStatus } from '../../services/mockData';
+import { User, Order, OrderStatus, OrderType, AppNotification } from '../../types';
+import { getOrdersByDriver, updateOrderStatus, getUnreadNotifications, markNotificationRead } from '../../services/mockData';
 import { MobileLayout } from '../../components/Layout';
 import { Button } from '../../components/Button';
 import { STATUS_LABELS, STATUS_COLORS } from '../../types';
@@ -10,17 +10,61 @@ interface DriverAppProps {
   onLogout: () => void;
 }
 
+// --- Notification Toast Component ---
+const NotificationToast: React.FC<{ notification: AppNotification; onDismiss: () => void }> = ({ notification, onDismiss }) => {
+    useEffect(() => {
+        const timer = setTimeout(onDismiss, 5000); // Auto dismiss after 5s
+        return () => clearTimeout(timer);
+    }, [notification]);
+
+    return (
+        <div className="fixed top-4 left-4 right-4 z-50 animate-slide-down" onClick={onDismiss}>
+            <div className="bg-slate-800/95 backdrop-blur-md text-white p-4 rounded-2xl shadow-2xl border border-slate-700 flex items-start gap-4 cursor-pointer">
+                <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0 text-xl">
+                    {notification.type === 'success' ? '✅' : notification.type === 'warning' ? '⚠️' : '🔔'}
+                </div>
+                <div className="flex-1">
+                    <div className="flex justify-between items-center mb-1">
+                        <h4 className="font-bold text-sm uppercase tracking-wide opacity-90">{notification.title}</h4>
+                        <span className="text-[10px] opacity-50">Just now</span>
+                    </div>
+                    <p className="text-sm font-medium leading-tight">{notification.message}</p>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 export const DriverApp: React.FC<DriverAppProps> = ({ user, onLogout }) => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
+  const [activeNotification, setActiveNotification] = useState<AppNotification | null>(null);
 
   // Load orders
   useEffect(() => {
     loadOrders();
-    const interval = setInterval(loadOrders, 30000); // Poll every 30s
+    const interval = setInterval(loadOrders, 30000); // Poll orders every 30s
     return () => clearInterval(interval);
+  }, [user.id]);
+
+  // Poll Notifications
+  useEffect(() => {
+      const checkNotifications = async () => {
+          const notifs = await getUnreadNotifications(user.id);
+          if (notifs.length > 0) {
+              const latest = notifs[notifs.length - 1]; // Get latest
+              setActiveNotification(latest);
+              // Mark as read immediately when shown
+              await markNotificationRead(latest.id);
+              // Refresh orders in case it was a new order
+              loadOrders();
+          }
+      };
+
+      const notifInterval = setInterval(checkNotifications, 5000); // Poll notifications every 5s
+      return () => clearInterval(notifInterval);
   }, [user.id]);
 
   const loadOrders = async () => {
@@ -33,17 +77,22 @@ export const DriverApp: React.FC<DriverAppProps> = ({ user, onLogout }) => {
 
   if (activeOrderId && activeOrder) {
     return (
-      <ActiveOrderView 
-        order={activeOrder} 
-        onBack={() => setActiveOrderId(null)}
-        onUpdate={() => loadOrders()}
-        isDark={darkMode}
-      />
+      <>
+          {activeNotification && <NotificationToast notification={activeNotification} onDismiss={() => setActiveNotification(null)} />}
+          <ActiveOrderView 
+            order={activeOrder} 
+            onBack={() => setActiveOrderId(null)}
+            onUpdate={() => loadOrders()}
+            isDark={darkMode}
+          />
+      </>
     );
   }
 
   return (
     <MobileLayout title="My Schedule" isDark={darkMode}>
+      {activeNotification && <NotificationToast notification={activeNotification} onDismiss={() => setActiveNotification(null)} />}
+      
       <div className="flex justify-between items-end mb-6 px-1">
         <div>
             <div className="text-xs font-bold uppercase tracking-wider opacity-60 mb-1">Driver</div>

@@ -1,4 +1,4 @@
-import { Order, OrderStatus, OrderType, ScrapType, TruckType, User, UserRole, ContainerSize } from '../types';
+import { Order, OrderStatus, OrderType, ScrapType, TruckType, User, UserRole, ContainerSize, AppNotification } from '../types';
 
 // Mock Users
 export const MOCK_USERS: User[] = [
@@ -86,6 +86,32 @@ export const INITIAL_ORDERS: Order[] = [
 
 // Simple in-memory storage simulation
 let orders = [...INITIAL_ORDERS];
+let notifications: AppNotification[] = [];
+
+// --- Notification Helpers ---
+
+const addNotification = (n: Omit<AppNotification, 'id' | 'timestamp' | 'read'>) => {
+    const newNotif: AppNotification = {
+        ...n,
+        id: `n${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        read: false
+    };
+    notifications.push(newNotif);
+};
+
+export const getUnreadNotifications = (userId: string) => 
+    Promise.resolve(notifications.filter(n => n.userId === userId && !n.read));
+
+export const markNotificationRead = (id: string) => {
+    const idx = notifications.findIndex(n => n.id === id);
+    if (idx > -1) {
+        notifications[idx].read = true;
+    }
+    return Promise.resolve();
+};
+
+// --- Order Helpers ---
 
 export const getOrders = () => Promise.resolve([...orders]);
 
@@ -95,7 +121,21 @@ export const getOrdersByDriver = (driverId: string) =>
 export const updateOrderStatus = (orderId: string, status: OrderStatus, data?: Partial<Order>) => {
   const idx = orders.findIndex(o => o.id === orderId);
   if (idx > -1) {
+    const oldStatus = orders[idx].status;
     orders[idx] = { ...orders[idx], status, ...data };
+
+    // Trigger Notification on significant status change (simulated "Office Action")
+    // e.g. If status moves from ISSUE -> PLANNED (Resolved)
+    if (oldStatus === OrderStatus.ISSUE && status === OrderStatus.PLANNED) {
+        addNotification({
+            userId: orders[idx].driverId,
+            title: 'Issue Resolved',
+            message: `The issue with ${orders[idx].clientName} has been resolved. You may proceed.`,
+            type: 'success',
+            orderId: orderId
+        });
+    }
+
     return Promise.resolve(orders[idx]);
   }
   return Promise.reject('Order not found');
@@ -104,6 +144,16 @@ export const updateOrderStatus = (orderId: string, status: OrderStatus, data?: P
 export const createOrder = (order: Omit<Order, 'id'>) => {
   const newOrder = { ...order, id: `o${Math.floor(Math.random() * 10000)}` };
   orders.push(newOrder);
+
+  // Trigger Notification for the Driver
+  addNotification({
+      userId: newOrder.driverId,
+      title: 'New Job Assigned',
+      message: `New ${newOrder.type === OrderType.DELIVERY ? 'Delivery' : 'Collection'} at ${newOrder.clientName}`,
+      type: 'info',
+      orderId: newOrder.id
+  });
+
   return Promise.resolve(newOrder);
 };
 

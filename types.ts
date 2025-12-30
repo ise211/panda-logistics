@@ -93,6 +93,17 @@ export interface ExportLoad {
   timestamp: string;
 }
 
+export interface AppNotification {
+  id: string;
+  userId: string; // Recipient
+  title: string;
+  message: string;
+  type: 'info' | 'success' | 'warning' | 'error';
+  timestamp: string;
+  read: boolean;
+  orderId?: string;
+}
+
 export const STATUS_LABELS: Record<OrderStatus, string> = {
   [OrderStatus.PLANNED]: 'Planned',
   [OrderStatus.IN_TRANSIT]: 'In Transit',
