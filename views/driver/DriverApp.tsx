@@ -121,7 +121,6 @@ export const DriverApp: React.FC<DriverAppProps> = ({ user, onLogout }) => {
 
 // Sub-component for Active Order Detail
 const ActiveOrderView: React.FC<{ order: Order, onBack: () => void, onUpdate: () => void, isDark: boolean }> = ({ order, onBack, onUpdate, isDark }) => {
-  const [step, setStep] = useState<number>(1);
   const [weightData, setWeightData] = useState({ estimated: '', ticket: '' });
   const [checklist, setChecklist] = useState({ ppe: false, vehicle: false, docs: false });
   // Delivery specific checklist
@@ -132,18 +131,6 @@ const ActiveOrderView: React.FC<{ order: Order, onBack: () => void, onUpdate: ()
   const [issueText, setIssueText] = useState('');
 
   const isDelivery = order.type === OrderType.DELIVERY;
-
-  // Sync logical step with status
-  useEffect(() => {
-    switch (order.status) {
-        case OrderStatus.PLANNED: setStep(1); break;
-        case OrderStatus.IN_TRANSIT: setStep(2); break;
-        case OrderStatus.ON_SITE: setStep(3); break;
-        case OrderStatus.ON_SCALE: setStep(4); break;
-        case OrderStatus.COMPLETED: setStep(5); break;
-        default: setStep(1);
-    }
-  }, [order.status]);
 
   const handleStatusChange = async (newStatus: OrderStatus, extraData?: any) => {
     await updateOrderStatus(order.id, newStatus, extraData);

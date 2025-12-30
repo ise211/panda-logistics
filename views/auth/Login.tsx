@@ -1,5 +1,4 @@
 import React from 'react';
-import { Button } from '../../components/Button';
 import { MOCK_USERS } from '../../services/mockData';
 import { User } from '../../types';
 
@@ -13,11 +12,11 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
       <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
         <div className="bg-white p-8 pb-4 text-center border-b border-gray-100">
           <img 
-            src="https://i.ibb.co/6803875/Panda-Rosa-Metals.png" 
-            alt="Panda Rosa Metals" 
+            src="https://www.pandarosametals.co.uk/wp-content/uploads/2015/10/logo.jpg" 
+            alt="PandaRosaMetals" 
             className="h-24 mx-auto object-contain mb-2"
           />
-          <p className="text-secondary opacity-70 mt-1 font-medium">Scrapyard Logistics System</p>
+          <p className="text-secondary opacity-70 mt-1 font-medium">PandaRosaMetals Logistics System</p>
         </div>
         
         <div className="p-8 space-y-6">

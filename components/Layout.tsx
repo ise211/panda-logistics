@@ -45,8 +45,8 @@ export const WebLayout: React.FC<{
       <aside className="w-64 bg-secondary text-white flex-shrink-0 hidden md:flex flex-col">
         <div className="p-6 bg-white flex justify-center items-center">
             <img 
-                src="https://i.ibb.co/6803875/Panda-Rosa-Metals.png" 
-                alt="Panda Rosa Metals" 
+                src="https://www.pandarosametals.co.uk/wp-content/uploads/2015/10/logo.jpg" 
+                alt="PandaRosaMetals" 
                 className="h-16 w-auto object-contain"
             />
         </div>
@@ -70,7 +70,7 @@ export const WebLayout: React.FC<{
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <header className="bg-white shadow-sm px-6 py-4 flex justify-between items-center md:hidden">
-           <img src="https://i.ibb.co/6803875/Panda-Rosa-Metals.png" alt="Panda Rosa Metals" className="h-10" />
+           <img src="https://www.pandarosametals.co.uk/wp-content/uploads/2015/10/logo.jpg" alt="PandaRosaMetals" className="h-10" />
            <button onClick={onLogout} className="text-sm text-red-600">Logout</button>
         </header>
         <header className="bg-white shadow-sm px-8 py-4 hidden md:block border-b border-gray-200">

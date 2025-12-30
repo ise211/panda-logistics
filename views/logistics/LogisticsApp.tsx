@@ -1022,7 +1022,7 @@ const ShipLoadingView: React.FC = () => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {loads.map((load, index) => {
+                                    {loads.map((load) => {
                                         // Calculate running total up to this point (reversed because list is new->old)
                                         // Actually simplest to just show individual, maybe running total is confusing in reverse order.
                                         // Let's just show individual rows.
