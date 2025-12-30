@@ -1,0 +1,8 @@
+{
+  "name": "panda Logistics",
+  "description": "Comprehensive scrapyard management system with a mobile interface for drivers and a web dashboard for logistics.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ]
+}
